@@ -20,12 +20,9 @@ public class HelperMessageService {
         }
     }
 
+
     public String getMessageKey(String messageId){
         return messageKeyPrefix + messageId;
-    }
-
-    public String getChannelKey(String channelId){
-        return channelKeyPrefix + channelId + channelKeyPostfix;
     }
 
 

@@ -27,20 +27,10 @@ public class EditChannelService{
 
     @Transactional
     public void creatingChannel( String channelId , String name , String Description , String userId , Team team) {
-        Channel channel = channelRepository.getChannelByChannelId(channelId);
-        LocalDateTime now = LocalDateTime.now();
-        channel.setName(name);
-        channel.setStatus(editStatus);
-        channel.setDescription(Description);
-        channel.setUpdateBy(userId);
-        channel.setUpdateAt(now);
-        channel.setTeam(team);
-        channelRepository.save(channel);
-        deleteChannelCache(team.getTeamId(), channelId);
+
     }
 
     private void deleteChannelCache( String teamId , String channelId){
-        redisTemplate.opsForHash().delete(teamKeyPrefix + teamId ,channelKeyPrefix + channelId);
     }
 
 }

@@ -6,7 +6,6 @@ import com.example.peacockxt.Models.GroupModule.ChannelModule.Message;
 import com.example.peacockxt.Service.CustomModels.MessageResponse;
 import com.example.peacockxt.Service.MessageModule.HelperMessageService;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.TimeUnit;
@@ -15,8 +14,6 @@ import java.util.concurrent.TimeUnit;
 public class CreateMessageFromCache {
     private final RedisTemplate<String, MessageResponse> messageRedisTemplate ;
     private final HelperMessageService helperMessageService;
-
-    private final int ttlDays = 5;
 
     public CreateMessageFromCache(RedisTemplate<String, MessageResponse> messageRedisTemplate, HelperMessageService helperMessageService) {
         this.messageRedisTemplate = messageRedisTemplate;
@@ -27,7 +24,8 @@ public class CreateMessageFromCache {
         try{
             String messageKey = helperMessageService.getMessageKey(message.getMessageId().toString());
             MessageResponse messageResponse = messageResponseBuilder(message,reply);
-            messageRedisTemplate.opsForValue().setIfAbsent(messageKey,messageResponse,ttlDays,TimeUnit.DAYS);
+            final int ttlDays = 5;
+            messageRedisTemplate.opsForValue().set(messageKey,messageResponse, ttlDays,TimeUnit.DAYS);
         }
         catch (Exception e){
             throw new CacheAccessException("Cache Writing fail",e);
@@ -35,16 +33,17 @@ public class CreateMessageFromCache {
     }
 
     private MessageResponse messageResponseBuilder(Message message , Message reply ){
-        return MessageResponse.builder()
+        MessageResponse.MessageResponseBuilder builder = MessageResponse.builder()
                 .messageId(message.getMessageId())
                 .content(message.getContent())
                 .status(message.getStatus())
                 .createTime(message.getCreateAt())
-                .createBy(message.getCreateBy())
-                .replyId(reply.getMessageId())
-                .replyContent(reply.getContent())
-                .replierId(reply.getCreateBy())
-                .build();
+                .createBy(message.getCreateBy());
+        if(reply!=null){
+            builder.replyId(reply.getMessageId())
+                    .replyContent(reply.getContent());
+        }
+        return builder.build();
     }
 
 

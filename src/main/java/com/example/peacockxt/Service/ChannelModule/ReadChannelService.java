@@ -1,4 +1,6 @@
 package com.example.peacockxt.Service.ChannelModule;
+import com.example.peacockxt.Models.CustomException.BusinessLogicException;
+import com.example.peacockxt.Models.CustomException.DatabaseException;
 import com.example.peacockxt.Models.GroupModule.ChannelModule.Channel;
 import com.example.peacockxt.Repository.Implimentation.ChannelRepository;
 import org.springframework.data.redis.core.HashOperations;
@@ -23,27 +25,8 @@ public class ReadChannelService {
         this.hashOperations = channelRedisTemplate.opsForHash();
     }
 
-    List<Channel> readChannel(String teamId){
-        return channelRepository.getChannelsByTeam(teamId);
-    }
-
-
     public Channel readSingleChannel(String channelId){
-        return channelRepository.getChannelByChannelId(channelId);
-    }
 
-    public List<Channel> readAside(String teamId){
-        String redisKey = teamKeyPrefix + teamId;
-        List<Channel> channels = hashOperations.values(redisKey);
-        if(channels.isEmpty()){
-            List<Channel> channelFromDb= readChannel(teamId);
-            for(Channel channel : channelFromDb){
-                hashOperations.put(teamKeyPrefix+teamId,channelKeyPrefix+channel.getChannelId(), channel);
-                channelRedisTemplate.expire(teamKeyPrefix+teamId,timeToLive, TimeUnit.DAYS);
-            }
-            return channelFromDb;
-        }
-        return channels;
     }
 
 }

@@ -1,5 +1,4 @@
 package com.example.peacockxt.Service.MessageModule.ReadMessage;
-
 import com.example.peacockxt.Models.CustomException.DatabaseException;
 import com.example.peacockxt.Models.GroupModule.ChannelModule.Message;
 import com.example.peacockxt.Repository.Implimentation.MessageRepository;
@@ -17,15 +16,6 @@ public class ReadMessageFromDatabase {
 
     public ReadMessageFromDatabase(MessageRepository messageRepository) {
         this.messageRepository = messageRepository;
-    }
-
-    public List<Message> jumpingMessage(long pivotId, String channelId) {
-        try{
-            return messageRepository.getMessagesByPivotId(pivotId, channelId);
-        }
-        catch(Exception e){
-            throw new DatabaseException("cannot read message from DB",e);
-        }
     }
 
     public MessageResponse getDirectMessageResponseForCache(String channelId,Long pivotId) {
@@ -53,6 +43,15 @@ public class ReadMessageFromDatabase {
         }
         catch(Exception e){
             throw new DatabaseException("Cannot read indexes from DB", e);
+        }
+    }
+
+    protected Message getMessage(Long  messageId){
+        try{
+            return messageRepository.getMessageByMessageId(messageId);
+        }
+        catch(DatabaseException e){
+            throw new DatabaseException("Cannot read messages from DB", e);
         }
     }
 

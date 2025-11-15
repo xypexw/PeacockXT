@@ -28,15 +28,14 @@ public class Message {
     private String createBy;
 
     private LocalDateTime updateAt;
+
+
     private String updateBy;
 
     private String status;
 
     @Column(name = "reply_id", insertable = false, updatable = false)
-    private String replyId;
-
-    @Column(name = "channel_id", insertable = false, updatable = false)
-    private String channelId;
+    private Long replyId;
 
     // ✅ Many-to-one relationship with Channel
     @ManyToOne(fetch = FetchType.LAZY)
@@ -53,7 +52,7 @@ public class Message {
     private List<Message> replies;
 
     // Many to One for user
-    @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
 }

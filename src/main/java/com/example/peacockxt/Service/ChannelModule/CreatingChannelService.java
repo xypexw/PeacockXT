@@ -1,61 +1,94 @@
 package com.example.peacockxt.Service.ChannelModule;
-
+import com.example.peacockxt.Models.CustomException.BusinessLogicException;
+import com.example.peacockxt.Models.CustomException.CacheAccessException;
+import com.example.peacockxt.Models.CustomException.DatabaseException;
 import com.example.peacockxt.Models.GroupModule.ChannelModule.Channel;
 import com.example.peacockxt.Models.GroupModule.Team;
 import com.example.peacockxt.Repository.Implimentation.ChannelRepository;
 import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.transaction.Transactional;
-import org.springframework.data.redis.core.HashOperations;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.TimeToLive;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class CreatingChannelService {
+    private final Logger logger = LoggerFactory.getLogger(CreatingChannelService.class);
     private final RedisTemplate<String, Channel> channelRedisTemplate;
-    private final HashOperations<String, String, Channel> hashOps;
     private final ChannelRepository channelRepository;
-    private final SimpMessagingTemplate messagingTemplate; // WebSocket broker
-
-
+    private final HelperChannelService helperChannelService;
     public CreatingChannelService(RedisTemplate<String, Channel> channelRedisTemplate ,
                                   ChannelRepository channelRepository,
-                                  SimpMessagingTemplate messagingTemplate) {
+                                  HelperChannelService helperChannelService) {
         this.channelRedisTemplate = channelRedisTemplate;
         this.channelRepository = channelRepository;
-        this.hashOps = channelRedisTemplate.opsForHash();
-        this.messagingTemplate = messagingTemplate;
+        this.helperChannelService = helperChannelService;
     }
-    private final String teamKeyPrefix = "TEAM::";
-    private final String ChannelKeyPrefix = "CHANNEL::";
-    private final int timeToLive = 10;
-    private final String defaultStatus = "Default";
 
     @Transactional
-    public void CreatingChannel(String name , String Description , String userId , Team team) {
-        final String channelKey = UuidCreator.getTimeBased().toString();
-        LocalDateTime now = LocalDateTime.now();
-        new Channel();
-        Channel channel = Channel.builder().
-                channelId(channelKey).name(name).description(name).status(defaultStatus)
-                .createBy(userId).updateBy(userId)
-                .createAt(now).updateAt(now).team(team).build();
-        channelRepository.save(channel);
-
-        if(hashOps.putIfAbsent(teamKeyPrefix + team.getTeamId()
-                , ChannelKeyPrefix + channelKey, channel)){
-            channelRedisTemplate.expire(teamKeyPrefix + team.getTeamId(), timeToLive, TimeUnit.DAYS);
+    public void CreatingChannel(String name , String description , String userId , String teamId) {
+        String channelId = UuidCreator.getTimeBased().toString();
+        try{
+            Team team = helperChannelService.getTeam(teamId);
+            if(team==null){
+                throw new BusinessLogicException("Team is not exist");
+            }
+            Channel channel = channelBuilder(channelId,name,description,userId,team);
+            try{
+                deleteKeyInCache(team);
+            }
+            catch(CacheAccessException e){
+                logger.error("Cache crash when creating the channel {} and cause by {} ",channelId,e.getMessage());
+            }
+            saveChannelInDatabase(channel);
+            logger.info("Channel {} created successfully by user {} in team {}", channelId, userId, teamId);
         }
 
-        messagingTemplate.convertAndSend(
-                "/topic/team/" + team.getTeamId() + "/channels",
-                channel
-        );
-
+        catch(DatabaseException e){
+            logger.error("database crash when creating the channel {} and cause by {} "  , channelId , e.getMessage() );
+            throw new BusinessLogicException("Database fail cause by " , e);
+        }
+        catch (BusinessLogicException e){
+            logger.error("Database crash when creating the channel :{} and cause by {} " , channelId , e.getMessage() );
+            throw new BusinessLogicException("Unknow fail  " , e);
+        }
     }
+
+    private Channel channelBuilder( String channelId , String name , String description , String userId , Team team){
+        String defaultStatus = "Default";
+        return Channel.builder()
+                .channelId(channelId)
+                .name(name)
+                .description(description)
+                .createBy(userId)
+                .updateBy(userId)
+                .createAt(LocalDateTime.now())
+                .updateAt(LocalDateTime.now())
+                .status(defaultStatus)
+                .team(team)
+                .build();
+    }
+
+    private void saveChannelInDatabase(Channel channel){
+        try{
+            channelRepository.save(channel);
+        }
+        catch(Exception e){
+            throw new DatabaseException("Database fail in creating channel ", e);
+        }
+    }
+
+    private void deleteKeyInCache(Team team){
+        try{
+            String teamKey = helperChannelService.getTeamKeyPrefix(team.getTeamId());
+            channelRedisTemplate.delete(teamKey);
+        }
+        catch(Exception e){
+            throw new CacheAccessException("Cache fail in creating channel ", e);
+        }
+    }
+
 
 }

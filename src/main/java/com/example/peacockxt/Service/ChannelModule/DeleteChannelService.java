@@ -18,8 +18,7 @@ public class DeleteChannelService {
     }
 
     public void DeleteChannelCache( String teamId  , String channelId) {
-        channelRepository.deleteChannelByChannelId(channelId);
-        hashOperations.delete(teamKeyPrefix+teamId,channelKeyPrefix + channelId);
+
     }
 
 }

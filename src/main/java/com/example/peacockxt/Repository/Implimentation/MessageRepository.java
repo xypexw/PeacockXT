@@ -13,9 +13,7 @@ public interface MessageRepository extends JpaRepository<Message,Float> {
     void deleteMessageByMessageId(Long messageId);
     Message getMessageByMessageId(Long messageId);
 
-    @Query(value = "SELECT * FROM message WHERE channel_id = :channelId AND messageId < :pivotId ORDER BY messageId DESC LIMIT 20",
-            nativeQuery = true)
-    List<Message> getMessagesByPivotId(@Param("pivotId") Long pivotId, @Param("channelId") String channelId);
+
 
     @Query("""
         SELECT new com.example.peacockxt.Service.CustomModels.MessageResponse(
@@ -23,7 +21,7 @@ public interface MessageRepository extends JpaRepository<Message,Float> {
             m.createAt,r.messageId,r.content,r.createBy
         )
         FROM Message m LEFT JOIN m.replyTo r
-        WHERE m.channelId = :channelId AND m.messageId < :pivotId
+        WHERE m.channel.channelId = :channelId AND m.messageId < :pivotId
         ORDER BY m.messageId DESC
    """)
     List<MessageResponse> fetchDirectResponse(
@@ -38,12 +36,12 @@ public interface MessageRepository extends JpaRepository<Message,Float> {
             m.createAt,r.messageId,r.content,r.createBy
         )
         FROM Message m LEFT JOIN m.replyTo r
-        WHERE m.channelId = :channelId AND m.messageId = :pivotId
+        WHERE m.channel.channelId = :channelId AND m.messageId = :pivotId
     """)
     MessageResponse fetchMessageResponseByMessageId(@Param("pivotId") Long pivotId,
                                                     @Param("channelId") String channelId);
 
-    @Query("SELECT m.messageId from Message m where m.channelId = :channelId and m.messageId < :pivotId order by m.messageId DESC ")
+    @Query("SELECT m.messageId from Message m where m.channel.channelId = :channelId and m.messageId < :pivotId order by m.messageId DESC ")
     List<Long> getCurrentIndex( @Param("pivotId") Long pivotId , @Param("channelId") String channelId,Pageable pageable);
 
 
