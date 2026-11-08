@@ -8,7 +8,7 @@ public class PeacockXtApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(PeacockXtApplication.class, args);
-        System.out.println("PeacockXtApplication started");
+        System.out.println("PeacockXtrApplication started");
     }
 
 }

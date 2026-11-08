@@ -1,6 +1,9 @@
 package com.example.peacockxt.Configuration;
 
+import com.example.peacockxt.Filter.WebSocketBindingInterceptor;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -8,21 +11,30 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 
 @Configuration
 @EnableWebSocketMessageBroker
+@RequiredArgsConstructor
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final WebSocketBindingInterceptor webSocketBindingInterceptor;
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Client sẽ connect vào đây
-        registry.addEndpoint("/ws").setAllowedOrigins("*");
-        // Nếu muốn hỗ trợ fallback cho trình duyệt cũ thì thêm .withSockJS()
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*");
+
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
     }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        // /app là prefix của các MessageMapping từ client gửi lên server
         registry.setApplicationDestinationPrefixes("/app");
+        registry.enableSimpleBroker("/topic", "/queue");
+        registry.setUserDestinationPrefix("/user");
+    }
 
-        // /topic là prefix cho server broadcast tới client
-        registry.enableSimpleBroker("/topic");
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(webSocketBindingInterceptor);
     }
 }

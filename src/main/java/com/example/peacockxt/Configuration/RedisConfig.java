@@ -1,75 +1,116 @@
 package com.example.peacockxt.Configuration;
-import com.example.peacockxt.Models.GroupModule.ChannelModule.Channel;
-import com.example.peacockxt.Models.GroupModule.PostModule.Post;
-import com.example.peacockxt.Models.GroupModule.Team;
-import com.example.peacockxt.Models.UserModule.User;
-import com.example.peacockxt.Service.CustomModels.MessageResponse;
+
+import com.example.peacockxt.Models.*;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.hibernate6.Hibernate6Module;
+
 @Configuration
 public class RedisConfig {
 
-    private <K,V> RedisTemplate<K,V> builderTemplate(
-            RedisConnectionFactory redisConnectionFactory,
-            RedisSerializer<K>  keySerializer,
-            RedisSerializer<V> valueSerializer) {
-        RedisTemplate<K,V> redisTemplate = new RedisTemplate<>();
-        redisTemplate.setConnectionFactory(redisConnectionFactory);
-        redisTemplate.setKeySerializer(keySerializer);
-        redisTemplate.setValueSerializer(valueSerializer);
-        return  redisTemplate;
-    };
+    private final ObjectMapper globalObjectMapper;
 
-    @Bean
-    public RedisTemplate<String, User> userRedisTemplate(RedisConnectionFactory redisConnectionFactory) {
-        Jackson2JsonRedisSerializer<User>  jackson2JsonRedisSerializer =
-                new Jackson2JsonRedisSerializer<>(User.class);
-        return builderTemplate(redisConnectionFactory, new StringRedisSerializer(), jackson2JsonRedisSerializer);
+    public RedisConfig(ObjectMapper globalObjectMapper) {
+        this.globalObjectMapper = globalObjectMapper;
     }
 
     @Bean
-    public RedisTemplate<String,Post> postRedisTemplate(RedisConnectionFactory redisConnectionFactory){
-        Jackson2JsonRedisSerializer<Post>  jackson2JsonRedisSerializer =
-                new Jackson2JsonRedisSerializer<>(Post.class);
-        return builderTemplate(redisConnectionFactory, new StringRedisSerializer(), jackson2JsonRedisSerializer);
+    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,Object.class);
+    }
+
+
+    @Bean
+    public RedisTemplate<String, Long> longRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,Long.class);
     }
 
     @Bean
-    public RedisTemplate<String, Team> groupRedisTemplate(RedisConnectionFactory redisConnectionFactory){
-        Jackson2JsonRedisSerializer<Team> jackson2JsonRedisSerializer =
-                new Jackson2JsonRedisSerializer<>(Team.class);
-        return builderTemplate(redisConnectionFactory, new StringRedisSerializer(), jackson2JsonRedisSerializer);
-
-    }
-
-    public HashOperations<String, String, Channel> hashOperations(RedisTemplate<String, Channel> redisTemplate) {
-        return redisTemplate.opsForHash();
+    public RedisTemplate<String, Comment> commentRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,Comment.class);
     }
 
     @Bean
-    public RedisTemplate<String, Channel> channelRedisTemplate(RedisConnectionFactory redisConnectionFactory){
-        Jackson2JsonRedisSerializer<Channel> jackson2JsonRedisSerializer =
-                new Jackson2JsonRedisSerializer<>(Channel.class);
-        return builderTemplate(redisConnectionFactory,new StringRedisSerializer(),jackson2JsonRedisSerializer);
+    public RedisTemplate<String, Team> teamRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,Team.class);
     }
 
     @Bean
-    public RedisTemplate<String, MessageResponse> messageRedisTemplate(RedisConnectionFactory redisConnectionFactory){
-        Jackson2JsonRedisSerializer<MessageResponse> jackson2JsonRedisSerializer
-                = new Jackson2JsonRedisSerializer<>(MessageResponse.class);
-        return builderTemplate(redisConnectionFactory,new StringRedisSerializer(),jackson2JsonRedisSerializer);
+    public RedisTemplate<String, User> userRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,User.class);
     }
 
     @Bean
-    public RedisTemplate<String, String > stringXRedisTemplate(RedisConnectionFactory redisConnectionFactory){
-        return builderTemplate(redisConnectionFactory,new StringRedisSerializer(),new StringRedisSerializer());
+    public RedisTemplate<String, Message> messageRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,Message.class);
     }
 
+    @Bean
+    public RedisTemplate<String, Membership> membershipRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,Membership.class);
+    }
+
+    @Bean
+    public RedisTemplate<String, Channel> channelRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,Channel.class);
+    }
+
+    @Bean
+    public RedisTemplate<String, CustomEmoji> customEmojiRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,CustomEmoji.class);
+    }
+
+    @Bean
+    public RedisTemplate<String, DirectMessage> directMessageRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,DirectMessage.class);
+    }
+
+    @Bean
+    public RedisTemplate<String, Event> eventRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,Event.class);
+    }
+
+    @Bean
+    public RedisTemplate<String, Post> postRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,Post.class);
+    }
+
+    @Bean
+    public RedisTemplate<String, PrivateSession> privateSessionRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf,PrivateSession.class);
+    }
+
+    private <T> RedisTemplate<String, T> buildTemplate(RedisConnectionFactory cf , Class<T> clazz) {
+        RedisTemplate<String, T> template = new RedisTemplate<>();
+        template.setConnectionFactory(cf);
+
+        StringRedisSerializer stringSerializer = new StringRedisSerializer();
+        template.setKeySerializer(stringSerializer);
+        template.setHashKeySerializer(stringSerializer);
+
+        ObjectMapper redisMapper = globalObjectMapper.copy();
+        redisMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+
+        Hibernate6Module hibernateModule = new Hibernate6Module();
+        hibernateModule.configure(Hibernate6Module.Feature.SERIALIZE_IDENTIFIER_FOR_LAZY_NOT_LOADED_OBJECTS, true);
+
+        redisMapper.registerModule(hibernateModule);
+        redisMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
+
+        Jackson2JsonRedisSerializer<T> jsonSerializer = new Jackson2JsonRedisSerializer<>(redisMapper, clazz);
+
+        template.setValueSerializer(jsonSerializer);
+        template.setHashValueSerializer(jsonSerializer);
+
+        template.afterPropertiesSet();
+        return template;
+    }
 }

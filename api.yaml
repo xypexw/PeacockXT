@@ -1,0 +1,1932 @@
+openapi: 3.1.0
+info:
+  title: OpenAPI definition
+  version: v0
+servers:
+  - url: http://localhost:8080
+    description: Generated server url
+paths:
+  /api/v1/teams/{teamId}:
+    put:
+      tags:
+        - team-controller
+      operationId: updateTeam
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTeamRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+        - team-controller
+      operationId: deleteTeam
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Role
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams/{teamId}/posts/{postId}:
+    get:
+      tags:
+        - post-controller
+      operationId: getPostDetail
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                $ref: "#/components/schemas/PostResponse"
+    put:
+      tags:
+        - post-controller
+      operationId: updatePost
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePostRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+        - post-controller
+      operationId: deletePost
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams/{teamId}/memberships/{membershipId}:
+    put:
+      tags:
+        - membership-controller
+      operationId: updateMembershipRole
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: membershipId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMembershipRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+        - membership-controller
+      operationId: deleteMembership
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: membershipId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams/{teamId}/channels/{channelId}:
+    put:
+      tags:
+        - channel-controller
+      operationId: updateChannel
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateChannelRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+        - channel-controller
+      operationId: deleteChannel
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/private-sessions/{sessionId}/messages/{messageId}:
+    put:
+      tags:
+        - direct-message-controller
+      operationId: updateMessage
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDirectMessageRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+        - direct-message-controller
+      operationId: deleteMessage
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/posts/{postId}/comments/{commentId}:
+    put:
+      tags:
+        - comment-controller
+      operationId: updateComment
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCommentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+        - comment-controller
+      operationId: deleteComment
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: commentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/channels/{channelId}/messages/{messageId}:
+    put:
+      tags:
+        - message-controller
+      operationId: editMessage
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditMessageRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+    delete:
+      tags:
+        - message-controller
+      operationId: deleteMessage_1
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams:
+    get:
+      tags:
+        - team-controller
+      operationId: getTeams
+      parameters:
+        - name: teamIds
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: integer
+              format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeamResponse"
+    post:
+      tags:
+        - team-controller
+      operationId: createTeam
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTeamRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams/{teamId}/posts:
+    get:
+      tags:
+        - post-controller
+      operationId: getPosts
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: cursorPostId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PostResponse"
+    post:
+      tags:
+        - post-controller
+      operationId: createPost
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePostRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams/{teamId}/memberships:
+    get:
+      tags:
+        - membership-controller
+      operationId: getTeamMemberships
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MembershipResponse"
+    post:
+      tags:
+        - membership-controller
+      operationId: addMemberToTeam
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMembershipRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams/{teamId}/events:
+    get:
+      tags:
+        - event-controller
+      operationId: readEvents
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: cursorId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventResponse"
+    post:
+      tags:
+        - event-controller
+      operationId: createEvent
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams/{teamId}/emojis:
+    get:
+      tags:
+        - emoji-controller
+      operationId: getAllEmojis
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmojiResponse"
+    post:
+      tags:
+        - emoji-controller
+      operationId: createEmoji
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEmojiRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams/{teamId}/channels:
+    get:
+      tags:
+        - channel-controller
+      operationId: getChannels
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: cursorId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChannelResponse"
+    post:
+      tags:
+        - channel-controller
+      operationId: createChannel
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateChannelRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/private-storage/batch-download-urls:
+    post:
+      tags:
+        - private-storage-controller
+      operationId: getBatchDownloadUrls
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BatchDownloadRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: object
+  /api/v1/private-sessions:
+    post:
+      tags:
+        - private-session-controller
+      operationId: createPrivateSession
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePrivateSessionRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/private-sessions/{sessionId}/messages:
+    get:
+      tags:
+        - direct-message-controller
+      operationId: readMessages
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: cursorId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DirectMessageResponse"
+    post:
+      tags:
+        - direct-message-controller
+      operationId: createMessage
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDirectMessageRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/posts/{postId}/comments:
+    get:
+      tags:
+        - comment-controller
+      operationId: readComments
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: cursorId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: X-Team-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CommentResponse"
+    post:
+      tags:
+        - comment-controller
+      operationId: createComment
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/v1/channels/{channelId}/messages:
+    get:
+      tags:
+        - message-controller
+      operationId: readMessages_1
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: cursorId
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MessageResponse"
+    post:
+      tags:
+        - message-controller
+      operationId: createMessage_1
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: channelId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Membership-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMessageRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+  /api/minio/webhook:
+    post:
+      tags:
+        - minio-webhook-controller
+      operationId: handleMinioEvent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JsonNode"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: string
+  /api/auth/setting-avatar:
+    post:
+      tags:
+        - auth-controller
+      operationId: updateAvatar
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAvatarRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: string
+  /api/auth/refresh:
+    post:
+      tags:
+        - auth-controller
+      operationId: refreshToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+  /api/auth/login:
+    post:
+      tags:
+        - auth-controller
+      operationId: login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+  /test-json:
+    get:
+      tags:
+        - test-controller
+      operationId: test
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: object
+                additionalProperties: {}
+  /api/v1/users/me/private-sessions:
+    get:
+      tags:
+        - private-session-controller
+      operationId: getMyPrivateSessions
+      parameters:
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PrivateSessionResponse"
+  /api/v1/users/me/private-sessions/with/{targetUserId}:
+    get:
+      tags:
+        - private-session-controller
+      operationId: getPrivateSessionWithUser
+      parameters:
+        - name: targetUserId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                $ref: "#/components/schemas/PrivateSessionResponse"
+  /api/v1/users/me/memberships:
+    get:
+      tags:
+        - membership-controller
+      operationId: getMyMemberships
+      parameters:
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MembershipResponse"
+  /api/v1/teams/{teamId}/memberships/me:
+    get:
+      tags:
+        - membership-controller
+      operationId: getMyMembershipInTeam
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                $ref: "#/components/schemas/MembershipResponse"
+  /api/v1/public-storage/upload-policy:
+    get:
+      tags:
+        - public-storage-controller
+      operationId: getUploadPolicy
+      parameters:
+        - name: objectName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/v1/public-storage/download-url:
+    get:
+      tags:
+        - public-storage-controller
+      operationId: getDownloadUrl
+      parameters:
+        - name: objectName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/v1/public-storage/delete-url:
+    get:
+      tags:
+        - public-storage-controller
+      operationId: getDeleteUrl
+      parameters:
+        - name: objectName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/v1/private-storage/upload-policy:
+    get:
+      tags:
+        - private-storage-controller
+      operationId: getUploadPolicy_1
+      parameters:
+        - name: objectName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/v1/private-storage/download-url:
+    get:
+      tags:
+        - private-storage-controller
+      operationId: getDownloadUrl_1
+      parameters:
+        - name: objectName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/v1/private-storage/delete-url:
+    get:
+      tags:
+        - private-storage-controller
+      operationId: getDeleteUrl_1
+      parameters:
+        - name: objectName
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+  /api/v1/teams/{teamId}/events/{eventId}:
+    delete:
+      tags:
+        - event-controller
+      operationId: deleteEvent
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+  /api/v1/teams/{teamId}/emojis/{emojiName}:
+    delete:
+      tags:
+        - emoji-controller
+      operationId: deleteEmoji
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: emojiName
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+  /api/auth/delete-avatar:
+    delete:
+      tags:
+        - auth-controller
+      operationId: settingAvatar
+      parameters:
+        - name: X-Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: X-User-Id
+          in: header
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            "*/*":
+              schema:
+                type: string
+components:
+  schemas:
+    UpdateTeamRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        type:
+          type: string
+    UpdatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+    UpdateMembershipRequest:
+      type: object
+      properties:
+        role:
+          type: string
+    UpdateChannelRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+      required:
+        - name
+    UpdateDirectMessageRequest:
+      type: object
+      properties:
+        content:
+          type: string
+    UpdateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+    EditMessageRequest:
+      type: object
+      properties:
+        content:
+          type: string
+    CreateTeamRequest:
+      type: object
+      properties:
+        description:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+    CreatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+    CreateMembershipRequest:
+      type: object
+      properties:
+        targetUserId:
+          type: integer
+          format: int64
+        role:
+          type: string
+    CreateEventRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+    CreateEmojiRequest:
+      type: object
+      properties:
+        emojiName:
+          type: string
+          minLength: 1
+        objectKey:
+          type: string
+          minLength: 1
+      required:
+        - emojiName
+        - objectKey
+    CreateChannelRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+      required:
+        - name
+    BatchDownloadRequest:
+      type: object
+      properties:
+        objectNames:
+          type: array
+          items:
+            type: string
+    CreatePrivateSessionRequest:
+      type: object
+      properties:
+        targetUserId:
+          type: integer
+          format: int64
+    CreateDirectMessageRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        replyToId:
+          type: integer
+          format: int64
+    CreateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        replyToId:
+          type: integer
+          format: int64
+    CreateMessageRequest:
+      type: object
+      properties:
+        content:
+          type: string
+        replyId:
+          type: integer
+          format: int64
+    JsonNode: {}
+    UpdateAvatarRequest:
+      type: object
+      properties:
+        keyObject:
+          type: string
+    RefreshTokenRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    PrivateSessionResponse:
+      type: object
+      properties:
+        privateSessionId:
+          type: integer
+          format: int64
+        partnerId:
+          type: integer
+          format: int64
+    MembershipResponse:
+      type: object
+      properties:
+        membershipId:
+          type: integer
+          format: int64
+        userId:
+          type: integer
+          format: int64
+        role:
+          type: string
+    TeamResponse:
+      type: object
+      properties:
+        teamId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        type:
+          type: string
+    PostResponse:
+      type: object
+      properties:
+        postId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        createAt:
+          type: string
+          format: date-time
+        updateAt:
+          type: string
+          format: date-time
+        createBy:
+          type: string
+    EventResponse:
+      type: object
+      properties:
+        eventId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        createAt:
+          type: string
+          format: date-time
+        createBy:
+          type: integer
+          format: int64
+        numberAttend:
+          type: integer
+          format: int32
+    EmojiResponse:
+      type: object
+      properties:
+        emojiName:
+          type: string
+        objectName:
+          type: string
+    ChannelResponse:
+      type: object
+      properties:
+        channelId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        createBy:
+          type: integer
+          format: int64
+    DirectMessageResponse:
+      type: object
+      properties:
+        messageId:
+          type: string
+        senderId:
+          type: string
+        content:
+          type: string
+        createAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        replyToId:
+          type: string
+        replyContent:
+          type: string
+        replierId:
+          type: string
+    CommentResponse:
+      type: object
+      properties:
+        commentId:
+          type: string
+        senderId:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        replyToId:
+          type: string
+        replyContent:
+          type: string
+        replierId:
+          type: string
+    MessageResponse:
+      type: object
+      properties:
+        messageId:
+          type: string
+        senderId:
+          type: string
+        content:
+          type: string
+        createAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        replyToId:
+          type: string
+        replyContent:
+          type: string
+        replierId:
+          type: string
