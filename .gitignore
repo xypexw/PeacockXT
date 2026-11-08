@@ -1,37 +1,102 @@
-HELP.md
-.gradle
+# =========================================================================
+# 🔥 SPRING BOOT & BUILD TOOLS (GRADLE / MAVEN)
+# =========================================================================
+# Compiled outputs
+target/
 build/
+out/
+bin/
+
+# Gradle caches & wrapper preservation
+.gradle/
 !gradle/wrapper/gradle-wrapper.jar
+
+# Maven cache cục bộ (nếu có)
+.m2/
+
+# Bỏ qua build/out/bin lỡ nằm trong src nhưng bảo vệ resource thực tế
 !**/src/main/**/build/
 !**/src/test/**/build/
+!**/src/main/**/out/
+!**/src/test/**/out/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
 
-### STS ###
+# Help & log files
+HELP.md
+*.log
+logs/
+**/logs/
+
+# =========================================================================
+# 🔒 SECURITY & LOCAL CONFIGURATIONS
+# =========================================================================
+# Biến môi trường & cấu hình local
+.env
+.env.local
+.env.*.local
+*.properties.local
+*.yml.local
+application-*.local.properties
+application-*.local.yml
+application-local.*
+
+# Cho phép commit các file template mẫu
+!.env.example
+!application.example.properties
+!application.example.yml
+
+# =========================================================================
+# 🐳 DOCKER & LOCAL DATA (Volumes/Databases)
+# =========================================================================
+# Thư mục dữ liệu mount volume ở root (tránh ignore nhầm src/.../data)
+/mysql_data/
+/rabbitmq_data/
+/minio_data/
+/redis_data/
+/data/
+
+# =========================================================================
+# 💻 IDEs & EDITORS
+# =========================================================================
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Eclipse / Spring Tool Suite (STS)
+.metadata/
 .apt_generated
 .classpath
 .factorypath
 .project
-.settings
+.settings/
 .springBeans
 .sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
+*.launch
 
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
+# Visual Studio Code
 .vscode/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# =========================================================================
+# 🖥️ OS GENERATED FILES
+# =========================================================================
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+desktop.ini
