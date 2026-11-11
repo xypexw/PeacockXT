@@ -20,18 +20,18 @@ public class ChannelProvider {
 
     public Channel getChannel(Long channelId) {
         try {
-            // 1. Lấy từ Cache
+            // 1. Get from Cache
             Channel cachedChannel = teamChannelRedisDao.getChannelInfo(channelId);
             if (cachedChannel != null) {
                 return cachedChannel;
             }
-            // 2. Miss Cache -> Query DB
+            // 2. Cache Miss -> Query DB
             Channel channel = channelRepository.getChannelByChannelId(channelId);
-            // Nếu DB cũng không có -> Trả về null
+            // If not found in DB either -> Return null
             if (channel == null) {
                 return null;
             }
-            // 3. Có trong DB -> Lưu vào cache rồi trả về
+            // 3. Found in DB -> Save to cache and return
             saveChannelInCache(channel);
             return channel;
 
@@ -49,7 +49,7 @@ public class ChannelProvider {
             if (channel == null) {
                 return false;
             }
-            // Có trong DB -> Backfill Cache và return true
+            // Found in DB -> Backfill Cache and return true
             saveChannelInCache(channel);
             return true;
         } catch (Exception e) {

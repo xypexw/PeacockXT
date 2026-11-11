@@ -23,7 +23,7 @@ public class JwtService {
         this.key = Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
     }
 
-    // Access Token (Ngắn hạn - 15 phút) - Chứa đủ thông tin
+    // Access Token (Short-lived - 15 minutes) - Contains complete user details
     public String generateAccessToken(Long userId, String username, String role, int expirationMillis) {
         Date now = new Date();
         return Jwts.builder()
@@ -36,7 +36,7 @@ public class JwtService {
                 .compact();
     }
 
-    // Refresh Token (Dài hạn - 7 ngày) - Chỉ chứa UserId để APISIX rate limit
+    // Refresh Token (Long-lived - 7 days) - Only contains UserId for APISIX rate limiting
     public String generateRefreshToken(Long userId, int expirationMillis) {
         Date now = new Date();
         return Jwts.builder()

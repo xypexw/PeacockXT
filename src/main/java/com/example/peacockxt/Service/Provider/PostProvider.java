@@ -21,20 +21,20 @@ public class PostProvider {
         return getPost(postId) != null;
     }
     public Post getPost(Long postId) {
-        // 1. Quét Cache
+        // 1. Check Cache
         Post cachedPost = postRedisDao.getPostData(postId);
         if (cachedPost != null) {
             return cachedPost;
         }
 
-        // 2. Cache Miss -> Lội DB
+        // 2. Cache Miss -> Query Database
         try {
-            // Xài JpaRepository mặc định
+            // Use default JpaRepository
             Post post = postRepository.findById(postId).orElse(null);
 
-            // 3. Có trong DB thì nhét lại vào Cache
+            // 3. If present in DB, repopulate into Cache
             if (post != null) {
-                // Dùng savePostBatch 1 phần tử để cập nhật DATA, không đụng tới ZSET index
+                // Use single-element savePostBatch to update DATA without modifying ZSET index
                 postRedisDao.savePostBatch(Collections.singletonList(post));
             }
             return post;

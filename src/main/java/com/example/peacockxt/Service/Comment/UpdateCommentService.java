@@ -38,15 +38,15 @@ public class UpdateCommentService {
 
     @Transactional
     public void updateComment(Long userId, Long membershipId, Long commentId, String newContent, Long postId) {
-        // 1. Fetch dữ liệu
+        // 1. Fetch Data
         Comment comment = commentProvider.getComment(commentId);
         Membership membership = membershipProvider.getMembership(membershipId);
         Post post = postProvider.getPost(postId);
 
-        // 2. Kiểm tra policy
+        // 2. policy checking
         commentPolicy.validateUpdateComment(userId, membership, post, comment);
 
-        // 3. Cập nhật dữ liệu
+        // 3. Update Data
         comment.setContent(newContent);
         comment.setStatus(EDITED_STATUS);
         comment.setUpdateAt(LocalDateTime.now());
@@ -54,10 +54,10 @@ public class UpdateCommentService {
 
         commentRepository.save(comment);
 
-        // 4. Bắn Event ra RabbitMQ (Thông báo comment đã bị sửa)
+        // 4. Push Event to RabbitMQ ( Edited Comment Notification )
         localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(comment, postId));
 
-        // 5. Đồng bộ Cache sau khi Commit DB thành công
+        // 5. Cache Sync after Commit DB Successfully
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

@@ -45,10 +45,10 @@ public class ReadDirectMessageService {
 
 
     private List<Long> getDirectMessageIndex(Long sessionId, Long cursorId) {
-        // 1. Lấy từ Cache
+        // 1. Get Data Form Cache
         Set<Long> messageIds = directMessageRedisDao.getMessageIdsBeforeCursor(sessionId, cursorId, defaultLimit);
         if (messageIds == null || messageIds.isEmpty()) {
-            // 2. Cache hụt -> Lội Database
+            // 2. Cache Miss -> Fetch Database
             Long effectiveCursor ;
             List<Long> indexes = new ArrayList<>();
             if(cursorId == null){

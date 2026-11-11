@@ -13,49 +13,49 @@ public class CommentPolicy {
 
     public void validateCreateComment(Long userId, Membership membership, Post post) {
 
-        // 1. Kiểm tra Membership có tồn tại hay không
+        // 1. Check if Membership exists
         if (membership == null) {
             throw new BusinessLogicException("Membership is not found");
         }
 
-        // 2. Kiểm tra Post có tồn tại hay không
+        // 2. Check if Post exists
         if (post == null) {
             throw new BusinessLogicException("Post is not found");
         }
 
-        // 3. Không cho phép tạo comment trên bài viết đã bị xóa
+        // 3. Do not allow creating comments on deleted posts
         if (DELETED_STATUS.equals(post.getStatus())) {
             throw new BusinessLogicException("Post has been deleted");
         }
 
-        // 4. Đảm bảo membership thực sự thuộc về user
+        // 4. Ensure membership actually belongs to the user
         if (!membership.getUserId().equals(userId)) {
             throw new BusinessLogicException("User ID does not match membership");
         }
 
-        // 5. Đảm bảo membership và post thuộc cùng một team
+        // 5. Ensure membership and post belong to the same team
         if (!membership.getTeamId().equals(post.getTeam().getTeamId())) {
             throw new BusinessLogicException("Team ID does not match post's team");
         }
 
-        // 6. Kiểm tra quyền comment chỉ Role READER chỉ có quyền đọc, không được tạo comment
+        // 6. Check comment permission: READER role has read-only access and cannot create comments
         if (READER_ROLE.equals(membership.getRole())) {
             throw new BusinessLogicException("User does not have permission to comment");
         }
     }
 
     public void validateUpdateComment(Long userId, Membership membership, Post post, Comment comment) {
-        // 1. Kiểm tra Comment có tồn tại hoặc bị xóa chưa
+        // 1. Check if Comment exists or has been deleted
         if (comment == null || DELETED_STATUS.equals(comment.getStatus())) {
             throw new BusinessLogicException("Comment not found or deleted");
         }
 
-        // 2. Kiểm tra Post có tồn tại hoặc bị xóa chưa
+        // 2. Check if Post exists or has been deleted
         if (post == null || DELETED_STATUS.equals(post.getStatus())) {
             throw new BusinessLogicException("Post has been deleted");
         }
 
-        // 3. Kiểm tra Membership có hợp lệ không
+        // 3. Validate Membership
         if (membership == null) {
             throw new BusinessLogicException("Membership is not found");
         }
@@ -63,17 +63,17 @@ public class CommentPolicy {
             throw new BusinessLogicException("User ID does not match membership");
         }
 
-        // 4. Kiểm tra Team ID có đồng nhất giữa Membership và Post không
+        // 4. Verify Team ID consistency between Membership and Post
         if (!membership.getTeam().getTeamId().equals(post.getTeam().getTeamId())) {
             throw new BusinessLogicException("Team ID does not match post's team");
         }
 
-        // 5. Kiểm tra quyền của Member trong Team , nếu Reader thì không có quyền comment
+        // 5. Check Member's permissions in the Team; Reader role cannot update comments
         if (READER_ROLE.equals(membership.getRole())) {
             throw new BusinessLogicException("User does not have permission to update comment");
         }
 
-        // 6. [QUAN TRỌNG NHẤT]: Chỉ chính chủ (người tạo comment) mới được phép sửa
+        // 6. [MOST IMPORTANT]: Only the author (creator of the comment) is allowed to edit it
         if (!comment.getCreateBy().equals(userId)) {
             throw new BusinessLogicException("Only the creator can edit this comment");
         }

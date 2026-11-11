@@ -43,7 +43,7 @@ public class DeleteCommentService {
     @Transactional
     public void deleteComment(Long userId, Long membershipId, Long commentId) {
 
-        // 1. Lấy dữ liệu và kiểm tra tồn tại
+        // 1. Retrieve data and check existence
         Comment comment = commentProvider.getComment(commentId);
         if (comment == null || comment.getStatus().equals(DELETED_STATUS)) {
             throw new BusinessLogicException("Comment not found or already deleted");
@@ -56,7 +56,7 @@ public class DeleteCommentService {
 
         Membership membership = membershipProvider.getMembership(membershipId);
 
-        // 2. Validate Business logic cơ bản
+        // 2. Validate basic business logic
         if (!membership.getUserId().equals(userId)) {
             throw new BusinessLogicException("User ID not match");
         }
@@ -69,7 +69,7 @@ public class DeleteCommentService {
             throw new BusinessLogicException("User don't have permission");
         }
 
-        // 3. CÚ CHỐT QUYỀN XÓA: Phải là Tác giả (Creator) HOẶC là Team Admin!
+        // 3. Deletion authorization check: Must be the Creator OR Team Admin!
         boolean isCreator = comment.getCreateBy().equals(userId);
         boolean isAdmin = teamPermission.isTeamAdmin(membershipId, userId);
 
@@ -77,7 +77,7 @@ public class DeleteCommentService {
             throw new BusinessLogicException("User must be Creator or Team Admin to delete this comment");
         }
 
-        // 4. Thực hiện Xóa Mềm (Soft Delete)
+        // 4. Perform Soft Delete
         comment.setContent(DELETED_CONTENT);
         comment.setStatus(DELETED_STATUS);
         comment.setUpdateAt(LocalDateTime.now());
@@ -87,11 +87,11 @@ public class DeleteCommentService {
 
         localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(comment, post.getPostId()));
 
-        // 5. Đồng bộ Cache sau khi Commit DB thành công
+        // 5. Synchronize cache after successful DB commit
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                // Xóa Cache của comment này đi
+                // Invalidate/delete cache for this comment
                 commentRedisDao.deleteCommentData(commentId);
             }
         });

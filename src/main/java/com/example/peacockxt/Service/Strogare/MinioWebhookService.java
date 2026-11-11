@@ -1,4 +1,4 @@
-package com.example.peacockxt.Service.Strogare;
+package com.example.peacockxt.service.storage;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.minio.MinioClient;
@@ -95,7 +95,7 @@ public class MinioWebhookService {
                     break;
 
                 default:
-                    deleteObject(publicBucketName,objectKey);
+                    deleteObject(publicBucketName, objectKey);
                     deleteObject(privateBucketName, objectKey);
                     break;
             }
@@ -105,23 +105,23 @@ public class MinioWebhookService {
     }
 
     private void handleUserAvatar(String key) {
-        // TODO: Xử lý logic cập nhật avatar của user
+        // TODO: Handle logic to update user avatar
     }
 
     private void handleServerEmoji(String key) {
-        // TODO: Xử lý logic cập nhật custom emoji của server
+        // TODO: Handle logic to update custom server emoji
     }
 
     private void handleCommentFile(String key) {
-        // TODO: Xử lý logic liên kết file đính kèm với comment
+        // TODO: Handle logic to link attached file to comment
     }
 
     private void handleMessageFile(String key) {
-        // TODO: Xử lý logic liên kết file đính kèm với channel message
+        // TODO: Handle logic to link attached file to channel message
     }
 
     private void handleDirectMessageFile(String key) {
-        // TODO: Xử lý logic liên kết file đính kèm với tin nhắn trực tiếp (DM)
+        // TODO: Handle logic to link attached file to direct message (DM)
     }
 
     private void deleteObject(String bucket, String key) {

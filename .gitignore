@@ -11,10 +11,10 @@ bin/
 .gradle/
 !gradle/wrapper/gradle-wrapper.jar
 
-# Maven cache cục bộ (nếu có)
+# Local Maven cache (if present)
 .m2/
 
-# Bỏ qua build/out/bin lỡ nằm trong src nhưng bảo vệ resource thực tế
+# Ignore build/out/bin if nested under src, but protect actual resources
 !**/src/main/**/build/
 !**/src/test/**/build/
 !**/src/main/**/out/
@@ -31,7 +31,7 @@ logs/
 # =========================================================================
 # 🔒 SECURITY & LOCAL CONFIGURATIONS
 # =========================================================================
-# Biến môi trường & cấu hình local
+# Environment variables & local configurations
 .env
 .env.local
 .env.*.local
@@ -41,7 +41,7 @@ application-*.local.properties
 application-*.local.yml
 application-local.*
 
-# Cho phép commit các file template mẫu
+# Allow committing configuration templates/examples
 !.env.example
 !application.example.properties
 !application.example.yml
@@ -49,7 +49,7 @@ application-local.*
 # =========================================================================
 # 🐳 DOCKER & LOCAL DATA (Volumes/Databases)
 # =========================================================================
-# Thư mục dữ liệu mount volume ở root (tránh ignore nhầm src/.../data)
+# Volume mount data directories at root level (prevents accidentally ignoring src/.../data)
 /mysql_data/
 /rabbitmq_data/
 /minio_data/

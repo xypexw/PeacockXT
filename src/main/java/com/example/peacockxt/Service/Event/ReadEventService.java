@@ -65,7 +65,7 @@ public class ReadEventService {
             }
         }
 
-        // Nếu cache hit 100% thì trả về luôn, không gọi DB nữa
+        // If 100% cache hit, return immediately without querying the database
         if (eventIdsNeedToFill.isEmpty()) {
             return eventsList;
         }
@@ -125,7 +125,7 @@ public class ReadEventService {
     }
 
     private Set<Long> fetchEventIdsInCache(Long teamId, Long cursorId) {
-        // Chỉ lấy PAGE_SIZE (20) theo cursor từ Redis thay vì lấy 500 ID
+        // Retrieve only PAGE_SIZE (20) items using cursor from Redis instead of fetching 500 IDs
         return eventRedisDao.getEventIdsBeforeCursor(teamId, cursorId, PAGE_SIZE);
     }
 

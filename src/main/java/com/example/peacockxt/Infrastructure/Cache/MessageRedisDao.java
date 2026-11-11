@@ -23,7 +23,7 @@ public class MessageRedisDao {
     private final RedisTemplate<String, Long> longRedisTemplate;
     private final RedisBatch redisBatch;
 
-    // Thêm "Anh bảo vệ" vào đây
+    // Inject the operation guard here
     private final RedisOperationGuard redisGuard;
 
     private Duration addJitter(Duration baseTtl) {
@@ -66,7 +66,7 @@ public class MessageRedisDao {
 
             List<Message> messages = messageRedisTemplate.opsForValue().multiGet(keys);
 
-            // Xử lý null an toàn ngay trong Guard
+            // Handle null safely inside the Guard
             return messages == null ? Collections.emptyList() : messages;
 
         }, Collections.emptyList(), "getMessagesBatch for " + messageIds.size() + " messages");
@@ -75,7 +75,7 @@ public class MessageRedisDao {
     public Boolean hasMessageInfo(Long messageId) {
         return redisGuard.safeRead(
                 () -> messageRedisTemplate.hasKey(RedisKey.MESSAGE_DATA.build(messageId)),
-                false, // Trả về false nếu Redis sập
+                false, // Return false if Redis is down
                 "hasMessageInfo for MessageId: " + messageId
         );
     }
