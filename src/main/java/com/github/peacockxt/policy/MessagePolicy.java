@@ -4,7 +4,6 @@ import com.github.peacockxt.models.Channel;
 import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.models.Membership;
 import com.github.peacockxt.models.Message;
-import com.example.peacockxt.Service.Provider.*;
 import com.github.peacockxt.service.provider.ChannelProvider;
 import com.github.peacockxt.service.provider.MembershipProvider;
 import com.github.peacockxt.service.provider.TeamPermission;
