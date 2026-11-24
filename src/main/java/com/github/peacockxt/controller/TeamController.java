@@ -80,7 +80,7 @@ public class TeamController {
             @RequestHeader("X-Idempotency-Key") String idempotencyKey,
             @PathVariable Long teamId,
             @RequestHeader("X-User-Id") Long userId,
-            // Receive role from BFF
+            // Receive role from BFF After The BFF Fetching
             @RequestHeader("X-User-Role") String role
     ) {
         deleteTeamService.deleteTeam(

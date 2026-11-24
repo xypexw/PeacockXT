@@ -1,4 +1,4 @@
-package com.github.peacockxt.filter;
+package com.github.peacockxt.filter.rest;
 import org.springframework.core.annotation.Order;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

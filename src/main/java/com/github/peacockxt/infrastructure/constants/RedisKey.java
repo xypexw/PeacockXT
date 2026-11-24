@@ -8,7 +8,6 @@ public enum RedisKey {
     SESSION_TOKEN("peacockxt:session:token:%s", DataType.VALUE, Duration.ofMinutes(15)),
     REFRESH_TOKEN("peacockxt:session:refresh_token:%s", DataType.VALUE, Duration.ofDays(7)),
     USER_ONLINE("peacockxt:user:%s:online", DataType.VALUE, Duration.ofSeconds(10)),
-
     //TEAM & MEMBERSHIP
     TEAM_INFO("peacockxt:team:%s:info", DataType.VALUE, Duration.ofDays(3)),
     MBS_IN_TEAMS("peacockxt:teams:%s:mbs", DataType.SET, null),
@@ -42,8 +41,10 @@ public enum RedisKey {
     TEAM_POST_INDEX("peacockxt:team:%s:post_index", DataType.ZSET, null),
     POST_DATA("peacockxt:post:%s", DataType.VALUE, Duration.ofDays(7)),
     POST_COMMENT_INDEX("peacockxt:post:%s:comment_index", DataType.ZSET, null),
-    COMMENT_DATA("peacockxt:comment:%s", DataType.VALUE, Duration.ofDays(7));
+    COMMENT_DATA("peacockxt:comment:%s", DataType.VALUE, Duration.ofDays(7)),
 
+    // TICKET
+    WS_TICKET("peacockxt:ws_ticket:%s", DataType.VALUE, Duration.ofSeconds(30));
 
     // Declare Data Type for Redis
     public enum DataType {

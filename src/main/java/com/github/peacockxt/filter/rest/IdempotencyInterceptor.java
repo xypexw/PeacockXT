@@ -1,4 +1,4 @@
-package com.github.peacockxt.filter;
+package com.github.peacockxt.filter.rest;
 
 import com.github.peacockxt.annotation.Idempotent;
 import jakarta.servlet.http.HttpServletRequest;

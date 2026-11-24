@@ -68,7 +68,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     runtimeOnly 'com.mysql:mysql-connector-j'
-    implementation 'org.apache.commons:commons-pool2' // Cho Redis connection pool
+    implementation 'org.apache.commons:commons-pool2' // For Redis connection pool
 
 
     // -----------------------------------------------------------

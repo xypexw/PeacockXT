@@ -1,6 +1,6 @@
 package com.github.peacockxt.configuration;
 
-import com.github.peacockxt.filter.IdempotencyInterceptor;
+import com.github.peacockxt.filter.rest.IdempotencyInterceptor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
