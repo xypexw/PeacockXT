@@ -1,7 +1,9 @@
 package com.github.peacockxt.service.post;
+
 import com.github.peacockxt.dto.event.InternalEvent;
 import com.github.peacockxt.dto.event.PostPayload;
 import com.github.peacockxt.infrastructure.cache.PostRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CachePost;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
 import com.github.peacockxt.models.Post;
@@ -17,8 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-
-
 import java.time.LocalDateTime;
 
 @Service
@@ -28,44 +28,57 @@ public class CreatePostService {
     private final PostRepository postRepository;
     private final TeamRepository teamRepository;
     private final PostPolicy postPolicy;
-    private final PostRedisDao  postRedisDao;
-    private final SnowflakeIdGenerator  snowflakeIdGenerator;
+    private final PostRedisDao postRedisDao;
+    private final SnowflakeIdGenerator snowflakeIdGenerator;
     private final String defaultStatus = "DEFAULT";
     private final String event_name = "CREATE_POST";
     private final LocalEventDispatcher localEventDispatcher;
 
-
     @Transactional
-    public void createPost(Long userId , Long teamId , Long membershipId , String title , String description  ){
-        postPolicy.validateCanCreatePost(userId , membershipId , teamId);
-        Post post = postBuilder(teamId,title,description,userId);
+    public void createPost(Long userId, Long teamId, Long membershipId, String title, String description) {
+        postPolicy.validateCanCreatePost(userId, membershipId, teamId);
+        Post post = postBuilder(teamId, title, description, userId);
         postRepository.save(post);
-        localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(post,teamId));
+        localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(post, teamId));
+
+        CachePost cachePost = CachePost.builder()
+                .postId(post.getPostId())
+                .title(post.getTitle())
+                .description(post.getDescription())
+                .status(post.getStatus())
+                .createAt(post.getCreateAt())
+                .updateAt(post.getUpdateAt())
+                .createBy(post.getCreateBy())
+                .updateBy(post.getUpdateBy())
+                .teamId(teamId)
+                .build();
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                savePostToCache(post,teamId);
+                savePostToCache(cachePost, teamId);
             }
         });
-
     }
 
-    private Post postBuilder(Long teamId , String title , String description , Long userId ){
-        Team team   = teamRepository.getReferenceById(teamId);
+    private Post postBuilder(Long teamId, String title, String description, Long userId) {
+        Team team = teamRepository.getReferenceById(teamId);
+        LocalDateTime now = LocalDateTime.now();
         return Post.builder()
                 .postId(snowflakeIdGenerator.nextId())
                 .title(title)
                 .description(description)
                 .status(defaultStatus)
-                .createAt(LocalDateTime.now())
+                .createAt(now)
                 .createBy(userId)
-                .updateAt(LocalDateTime.now())
+                .updateAt(now)
                 .updateBy(userId)
                 .team(team)
+                .teamId(teamId)
                 .build();
     }
 
-    private InternalEvent<PostPayload> internalEventBuilder( Post post , Long teamId ){
+    private InternalEvent<PostPayload> internalEventBuilder(Post post, Long teamId) {
         PostPayload payload = PostPayload.builder()
                 .postId(post.getPostId())
                 .title(post.getTitle())
@@ -84,8 +97,7 @@ public class CreatePostService {
                 .build();
     }
 
-    private void savePostToCache(Post post ,  Long teamId ){
-        postRedisDao.savePost(teamId,post);
+    private void savePostToCache(CachePost post, Long teamId) {
+        postRedisDao.savePost(teamId, post);
     }
-
 }

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "channel",
         indexes = {
-                @Index(name = "idx_team_create", columnList = "team_id, create_at")
+                @Index(name = "idx_channel_team_id_status", columnList = "team_id, channel_id, status")
         }
 )
 @Builder
@@ -48,5 +48,8 @@ public class Channel {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
+
+    @Column(name = "team_id", insertable = false, updatable = false)
+    private Long teamId;
 
 }

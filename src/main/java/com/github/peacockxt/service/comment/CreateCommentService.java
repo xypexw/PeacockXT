@@ -1,18 +1,21 @@
 package com.github.peacockxt.service.comment;
 
-import com.github.peacockxt.dto.event.CommentPayload; // Bạn nhớ tạo class DTO này nhé
+import com.github.peacockxt.dto.event.CommentPayload;
 import com.github.peacockxt.dto.event.InternalEvent;
 import com.github.peacockxt.infrastructure.cache.CommentRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheComment;
+import com.github.peacockxt.infrastructure.cache.models.CacheMembership;
+import com.github.peacockxt.infrastructure.cache.models.CachePost;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
 import com.github.peacockxt.models.Comment;
-import com.github.peacockxt.models.Membership;
 import com.github.peacockxt.models.Post;
 import com.github.peacockxt.policy.CommentPolicy;
 import com.github.peacockxt.repository.implementation.CommentRepository;
+import com.github.peacockxt.repository.implementation.PostRepository;
+import com.github.peacockxt.service.SnowflakeIdGenerator;
 import com.github.peacockxt.service.provider.MembershipProvider;
 import com.github.peacockxt.service.provider.PostProvider;
-import com.github.peacockxt.service.SnowflakeIdGenerator;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class CreateCommentService {
     private final CommentRepository commentRepository;
+    private final PostRepository postRepository;
     private final CommentRedisDao commentRedisDao;
     private final PostProvider postProvider;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
@@ -38,25 +42,38 @@ public class CreateCommentService {
 
     @Transactional
     public void createComment(Long userId, Long membershipId, Long postId, String content, Long replyToId) {
-        Membership membership = membershipProvider.getMembership(membershipId);
-        Post post = postProvider.getPost(postId);
+        CacheMembership membership = membershipProvider.getMembership(membershipId);
+        CachePost post = postProvider.getPost(postId);
 
         commentPolicy.validateCreateComment(userId, membership, post);
 
-        Comment comment = commentBuilder(userId, post, content, replyToId);
+        Comment comment = commentBuilder(userId, postId, content, replyToId);
         commentRepository.save(comment);
 
         localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(comment, postId));
 
+        CacheComment cacheComment = CacheComment.builder()
+                .commentId(comment.getCommentId())
+                .content(comment.getContent())
+                .status(comment.getStatus())
+                .createBy(comment.getCreateBy())
+                .updateBy(comment.getUpdateBy())
+                .createAt(comment.getCreateAt())
+                .updateAt(comment.getUpdateAt())
+                .replyToId(comment.getReplyToId())
+                .postId(postId)
+                .build();
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                commentRedisDao.saveComment(postId, comment);
+                commentRedisDao.saveComment(postId, cacheComment);
             }
         });
     }
 
-    private Comment commentBuilder(Long userId, Post post, String content, Long replyToId) {
+    private Comment commentBuilder(Long userId, Long postId, String content, Long replyToId) {
+        Post postRef = postRepository.getReferenceById(postId);
         return Comment.builder()
                 .commentId(snowflakeIdGenerator.nextId())
                 .content(content)
@@ -66,7 +83,8 @@ public class CreateCommentService {
                 .updateAt(LocalDateTime.now())
                 .updateBy(userId)
                 .replyToId(replyToId)
-                .post(post)
+                .post(postRef)
+                .postId(postId)
                 .build();
     }
 

@@ -1,8 +1,8 @@
 package com.github.peacockxt.policy;
 
-import com.github.peacockxt.models.customexception.BusinessLogicException;
-import com.github.peacockxt.models.Membership;
+import com.github.peacockxt.infrastructure.cache.models.CacheMembership;
 import com.github.peacockxt.models.Post;
+import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.service.provider.MembershipProvider;
 import com.github.peacockxt.service.provider.TeamPermission;
 import com.github.peacockxt.service.provider.TeamProvider;
@@ -40,52 +40,50 @@ public class PostPolicy {
         }
     }
 
-    public void validateCanCreatePost( Long userId , Long membershipId, Long teamId) {
-        if(!userProvider.hasUser(userId)){
+    public void validateCanCreatePost(Long userId, Long membershipId, Long teamId) {
+        if (!userProvider.hasUser(userId)) {
             throw new BusinessLogicException("user does not exist");
         }
-        if(!teamProvider.hasTeam(teamId)){
+        if (!teamProvider.hasTeam(teamId)) {
             throw new BusinessLogicException("team does not exist");
         }
-        if(teamPermission.isReader(membershipId,userId)){
+        if (teamPermission.isReader(membershipId, userId)) {
             throw new BusinessLogicException("team permission is reader");
         }
-
     }
 
     public void validateCanUpdatePost(Post post, Long updaterId, Long membershipId, Long teamId) {
-        if(!userProvider.hasUser(updaterId)){
+        if (!userProvider.hasUser(updaterId)) {
             throw new BusinessLogicException("user does not exist");
         }
-        if(!teamProvider.hasTeam(teamId)){
+        if (!teamProvider.hasTeam(teamId)) {
             throw new BusinessLogicException("team does not exist");
         }
-        if(teamPermission.isReader(membershipId,updaterId)){
+        if (teamPermission.isReader(membershipId, updaterId)) {
             throw new BusinessLogicException("user dont have permission");
         }
-        if(post == null){
+        if (post == null) {
             throw new BusinessLogicException("post not found");
         }
-        if(!post.getCreateBy().equals(updaterId)){
+        if (!post.getCreateBy().equals(updaterId)) {
             throw new BusinessLogicException("user is not post creator");
         }
     }
 
-    public void validateCanReadPost( Long userId, Long membershipId, Long teamId) {
-        if(!userProvider.hasUser(userId)){
+    public void validateCanReadPost(Long userId, Long membershipId, Long teamId) {
+        if (!userProvider.hasUser(userId)) {
             throw new BusinessLogicException("user does not exist");
         }
-        if(!teamProvider.hasTeam(teamId)){
+        if (!teamProvider.hasTeam(teamId)) {
             throw new BusinessLogicException("team does not exist");
         }
-        Membership membership = membershipProvider.getMembership(membershipId);
-        if(membership == null ) throw new BusinessLogicException("membership not found");
-        if(!membership.getTeamId().equals(teamId)) {
+        CacheMembership membership = membershipProvider.getMembership(membershipId);
+        if (membership == null) throw new BusinessLogicException("membership not found");
+        if (!membership.getTeamId().equals(teamId)) {
             throw new BusinessLogicException("membership is not belong to team");
         }
-        if(!membership.getUserId().equals(userId)){
+        if (!membership.getUserId().equals(userId)) {
             throw new BusinessLogicException("membership is not belong to user");
         }
     }
-    
 }

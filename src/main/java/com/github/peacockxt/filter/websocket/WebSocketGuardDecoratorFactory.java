@@ -4,15 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.stereotype.Component;
-import org.springframework.web.socket.CloseStatus;
-import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.WebSocketHandler;
-import org.springframework.web.socket.WebSocketMessage;
-import org.springframework.web.socket.WebSocketSession;
+import org.springframework.web.socket.*;
 import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
 import org.springframework.web.socket.handler.WebSocketHandlerDecoratorFactory;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Component
 @Slf4j
@@ -21,10 +18,11 @@ public class WebSocketGuardDecoratorFactory implements WebSocketHandlerDecorator
 
     private static final long WINDOW_MS = 15_000L;
     private static final int MAX_HEARTBEATS_PER_WINDOW = 4;
-    private static final int MAX_HEARTBEAT_BYTES = 4; // Only "\n" or "\r\n" are valid
+    private static final int MAX_TOTAL_FRAMES_PER_WINDOW = 20;
+    private static final int MAX_HEARTBEAT_BYTES = 4;
 
     private final WebSocketSessionRegistry sessionRegistry;
-    private final ConcurrentHashMap<String, HeartbeatWindow> heartbeatWindows = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, RateWindow> rateWindows = new ConcurrentHashMap<>();
 
     @Override
     public @NotNull WebSocketHandler decorate(@NotNull WebSocketHandler handler) {
@@ -33,22 +31,36 @@ public class WebSocketGuardDecoratorFactory implements WebSocketHandlerDecorator
             @Override
             public void afterConnectionEstablished(@NotNull WebSocketSession session) throws Exception {
                 sessionRegistry.register(session);
-                heartbeatWindows.put(session.getId(), new HeartbeatWindow());
+                rateWindows.put(session.getId(), new RateWindow());
                 super.afterConnectionEstablished(session);
             }
 
             @Override
             public void handleMessage(@NotNull WebSocketSession session, @NotNull WebSocketMessage<?> message)
                     throws Exception {
+                String sessionId = session.getId();
+
+                // 1. Block BinaryMessage (prevent bypassing Heartbeat Flood via binary "\n")
+                if (message instanceof BinaryMessage) {
+                    log.warn("Binary WebSocket frame not allowed [session={}]. Killing connection.", sessionId);
+                    rateWindows.remove(sessionId);
+                    sessionRegistry.killSession(sessionId, CloseStatus.NOT_ACCEPTABLE);
+                    return;
+                }
+
+                // 2. Enforce total rate limit & Heartbeat Flood protection (TextMessage only)
                 if (message instanceof TextMessage textMessage) {
                     String payload = textMessage.getPayload();
-                    if (isHeartbeatPayload(payload)) {
-                        if (payload.length() > MAX_HEARTBEAT_BYTES || isFlooding(session.getId())) {
-                            log.warn("Heartbeat flood detected [session={}]. Killing connection.", session.getId());
-                            heartbeatWindows.remove(session.getId());
-                            sessionRegistry.killSession(session.getId(), CloseStatus.POLICY_VIOLATION);
-                            return; // Drop frame immediately, do not forward to the STOMP decoder
-                        }
+                    boolean isHeartbeat = isHeartbeatPayload(payload);
+                    RateWindow window = rateWindows.computeIfAbsent(sessionId, k -> new RateWindow());
+
+                    if ((isHeartbeat && payload.length() > MAX_HEARTBEAT_BYTES)
+                            || !window.tryAcquire(isHeartbeat)) {
+                        log.warn("Inbound frame flood detected [session={}, heartbeat={}]. Killing.",
+                                sessionId, isHeartbeat);
+                        rateWindows.remove(sessionId);
+                        sessionRegistry.killSession(sessionId, CloseStatus.POLICY_VIOLATION);
+                        return;
                     }
                 }
                 super.handleMessage(session, message);
@@ -57,52 +69,61 @@ public class WebSocketGuardDecoratorFactory implements WebSocketHandlerDecorator
             @Override
             public void afterConnectionClosed(@NotNull WebSocketSession session, @NotNull CloseStatus closeStatus)
                     throws Exception {
-                sessionRegistry.unregister(session.getId());
-                heartbeatWindows.remove(session.getId());
-                super.afterConnectionClosed(session, closeStatus);
+                try {
+                    sessionRegistry.unregister(session.getId());
+                    rateWindows.remove(session.getId());
+                } finally {
+                    super.afterConnectionClosed(session, closeStatus);
+                }
             }
 
             @Override
             public void handleTransportError(@NotNull WebSocketSession session, @NotNull Throwable exception)
                     throws Exception {
-                sessionRegistry.unregister(session.getId());
-                heartbeatWindows.remove(session.getId());
+                // DO NOT unregister here! SubProtocolWebSocketHandler does not automatically close the session on handleTransportError.
+                // Cleanup is guaranteed to run in afterConnectionClosed once the socket actually closes.
                 super.handleTransportError(session, exception);
             }
         };
     }
 
     private boolean isHeartbeatPayload(String payload) {
-        if (payload.isEmpty()) {
-            return true;
-        }
+        if (payload.isEmpty()) return true;
         for (int i = 0; i < payload.length(); i++) {
             char c = payload.charAt(i);
-            if (c != '\n' && c != '\r') {
-                return false;
-            }
+            if (c != '\n' && c != '\r') return false;
         }
         return true;
     }
 
-    private boolean isFlooding(String sessionId) {
-        HeartbeatWindow window = heartbeatWindows.computeIfAbsent(sessionId, k -> new HeartbeatWindow());
-        return !window.tryAcquire();
-    }
-
-    private static class HeartbeatWindow {
+    // Use ReentrantLock instead of synchronized (best practice for Java 21 Virtual Threads)
+    private static class RateWindow {
+        private final ReentrantLock lock = new ReentrantLock();
         private long windowStartMs = System.currentTimeMillis();
-        private int count = 0;
+        private int totalCount = 0;
+        private int heartbeatCount = 0;
 
-        synchronized boolean tryAcquire() {
-            long now = System.currentTimeMillis();
-            if (now - windowStartMs >= WINDOW_MS) {
-                windowStartMs = now;
-                count = 1;
+        boolean tryAcquire(boolean isHeartbeat) {
+            lock.lock();
+            try {
+                long now = System.currentTimeMillis();
+                if (now - windowStartMs >= WINDOW_MS) {
+                    windowStartMs = now;
+                    totalCount = 0;
+                    heartbeatCount = 0;
+                }
+                totalCount++;
+                if (totalCount > MAX_TOTAL_FRAMES_PER_WINDOW) {
+                    return false;
+                }
+                if (isHeartbeat) {
+                    heartbeatCount++;
+                    return heartbeatCount <= MAX_HEARTBEATS_PER_WINDOW;
+                }
                 return true;
+            } finally {
+                lock.unlock();
             }
-            count++;
-            return count <= MAX_HEARTBEATS_PER_WINDOW;
         }
     }
 }

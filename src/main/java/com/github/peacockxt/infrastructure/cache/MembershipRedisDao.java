@@ -1,13 +1,13 @@
 package com.github.peacockxt.infrastructure.cache;
 
-import com.github.peacockxt.models.Membership;
+import com.github.peacockxt.infrastructure.cache.models.CacheMembership;
 import com.github.peacockxt.infrastructure.constants.RedisKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
 import java.time.Duration;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Component
@@ -15,7 +15,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class MembershipRedisDao {
 
     private final RedisTemplate<String, Long> longRedisTemplate;
-    private final RedisTemplate<String, Membership> membershipRedisTemplate;
+    private final RedisTemplate<String, CacheMembership> membershipRedisTemplate;
     private final RedisBatch redisBatch;
     private final RedisOperationGuard redisGuard;
 
@@ -24,7 +24,8 @@ public class MembershipRedisDao {
         return baseTtl.plusSeconds(ThreadLocalRandom.current().nextLong(1800));
     }
 
-    public void saveMembershipInfo(Membership membership) {
+    public void saveMembershipInfo(CacheMembership membership) {
+        if (membership == null || membership.getMembershipId() == null) return;
         redisGuard.safeWrite(() -> membershipRedisTemplate.opsForValue().set(
                         RedisKey.MBS_INFO.build(membership.getMembershipId()),
                         membership,
@@ -35,90 +36,114 @@ public class MembershipRedisDao {
     }
 
     public void addMembershipToTeam(Long membershipId, Long teamId) {
+        if (membershipId == null || teamId == null) return;
         redisGuard.safeWrite(
-                () -> longRedisTemplate.opsForSet().add(RedisKey.MBS_IN_TEAMS.build(teamId), membershipId),
+                () -> {
+                    String key = RedisKey.MBS_IN_TEAMS.build(teamId);
+                    longRedisTemplate.opsForSet().add(key, membershipId);
+                    longRedisTemplate.expire(key, addJitter(RedisKey.MBS_IN_TEAMS.getTtl()));
+                },
                 "addMembershipToTeam [Membership: " + membershipId + " -> Team: " + teamId + "]"
         );
     }
 
     public void addMembershipToUser(Long membershipId, Long userId) {
+        if (membershipId == null || userId == null) return;
         redisGuard.safeWrite(
-                () -> longRedisTemplate.opsForSet().add(RedisKey.USER_MBS.build(userId), membershipId),
+                () -> {
+                    String key = RedisKey.USER_MBS.build(userId);
+                    longRedisTemplate.opsForSet().add(key, membershipId);
+                    longRedisTemplate.expire(key, addJitter(RedisKey.USER_MBS.getTtl()));
+                },
                 "addMembershipToUser [Membership: " + membershipId + " -> User: " + userId + "]"
         );
     }
 
     public Set<Long> getAllMembershipIdsInTeam(Long teamId) {
+        if (teamId == null) return Collections.emptySet();
         return redisGuard.safeRead(
-                () -> longRedisTemplate.opsForSet().members(RedisKey.MBS_IN_TEAMS.build(teamId)),
+                () -> {
+                    Set<Long> result = longRedisTemplate.opsForSet().members(RedisKey.MBS_IN_TEAMS.build(teamId));
+                    return result == null ? Collections.emptySet() : result;
+                },
                 Collections.emptySet(),
                 "getAllMembershipIdsInTeam for Team: " + teamId
         );
     }
 
     public Set<Long> getAllMembershipIdsFromMember(Long userId) {
+        if (userId == null) return Collections.emptySet();
         return redisGuard.safeRead(
-                () -> longRedisTemplate.opsForSet().members(RedisKey.USER_MBS.build(userId)),
+                () -> {
+                    Set<Long> result = longRedisTemplate.opsForSet().members(RedisKey.USER_MBS.build(userId));
+                    return result == null ? Collections.emptySet() : result;
+                },
                 Collections.emptySet(),
                 "getAllMembershipIdsFromMember for User: " + userId
         );
     }
 
     public void removeMembershipFromTeam(Long membershipId, Long teamId) {
-        redisGuard.safeWrite(
+        if (membershipId == null || teamId == null) return;
+        redisGuard.safeInvalidate(
                 () -> longRedisTemplate.opsForSet().remove(RedisKey.MBS_IN_TEAMS.build(teamId), membershipId),
                 "removeMembershipFromTeam [Membership: " + membershipId + " from Team: " + teamId + "]"
         );
     }
 
     public void removeMembershipFromMember(Long membershipId, Long userId) {
-        redisGuard.safeWrite(
+        if (membershipId == null || userId == null) return;
+        redisGuard.safeInvalidate(
                 () -> longRedisTemplate.opsForSet().remove(RedisKey.USER_MBS.build(userId), membershipId),
                 "removeMembershipFromMember [Membership: " + membershipId + " from User: " + userId + "]"
         );
     }
 
     public boolean hasMembershipInfo(Long membershipId) {
+        if (membershipId == null) return false;
         return Boolean.TRUE.equals(redisGuard.safeRead(
                 () -> membershipRedisTemplate.hasKey(RedisKey.MBS_INFO.build(membershipId)),
-                false, // Default to false if Redis is down
+                false,
                 "hasMembershipInfo for ID: " + membershipId
         ));
     }
 
     public boolean hasMembershipIndexTeamKey(Long teamId) {
+        if (teamId == null) return false;
         return Boolean.TRUE.equals(redisGuard.safeRead(
-                () -> membershipRedisTemplate.hasKey(RedisKey.MBS_IN_TEAMS.build(teamId)),
-                false, // Default to false if Redis is down
+                () -> longRedisTemplate.hasKey(RedisKey.MBS_IN_TEAMS.build(teamId)),
+                false,
                 "hasMembershipInTeamKey for ID: " + teamId
         ));
     }
 
     public boolean hasMembershipIndexUserKey(Long userId) {
+        if (userId == null) return false;
         return Boolean.TRUE.equals(redisGuard.safeRead(
-                () -> membershipRedisTemplate.hasKey(RedisKey.USER_MBS.build(userId)),
-                false, // Default to false if Redis is down
+                () -> longRedisTemplate.hasKey(RedisKey.USER_MBS.build(userId)),
+                false,
                 "hasUserMembershipsKey for ID: " + userId
         ));
     }
 
-
     // ================= Batch Operations =================
 
-    public List<Membership> getMembershipBatch(List<Long> membershipIds) {
+    public List<CacheMembership> getMembershipBatch(List<Long> membershipIds) {
         if (membershipIds == null || membershipIds.isEmpty()) return Collections.emptyList();
 
         return redisGuard.safeRead(
                 () -> {
                     List<String> keys = membershipIds.stream().map(RedisKey.MBS_INFO::build).toList();
-                    return membershipRedisTemplate.opsForValue().multiGet(keys);
+                    List<CacheMembership> result = membershipRedisTemplate.opsForValue().multiGet(keys);
+                    return (result == null || result.isEmpty()) ? Collections.emptyList() : result;
                 },
                 Collections.emptyList(),
                 "getMembershipBatch for " + membershipIds.size() + " IDs"
         );
     }
 
-    public Membership getMembership(Long membershipId) {
+    public CacheMembership getMembership(Long membershipId) {
+        if (membershipId == null) return null;
         return redisGuard.safeRead(
                 () -> membershipRedisTemplate.opsForValue().get(RedisKey.MBS_INFO.build(membershipId)),
                 null,
@@ -126,15 +151,17 @@ public class MembershipRedisDao {
         );
     }
 
-    public void removeMembershipIdInManyMembersInTeam(List<Membership> memberships) {
+    public void removeMembershipIdInManyMembersInTeam(List<CacheMembership> memberships) {
         if (memberships == null || memberships.isEmpty()) return;
 
-        redisGuard.safeWrite(
+        redisGuard.safeInvalidate(
                 () -> {
                     Map<String, Long> keyToMembershipIdMap = new HashMap<>();
-                    for (Membership membership : memberships) {
-                        String key = RedisKey.USER_MBS.build(membership.getUserId());
-                        keyToMembershipIdMap.put(key, membership.getMembershipId());
+                    for (CacheMembership membership : memberships) {
+                        if (membership != null && membership.getUserId() != null && membership.getMembershipId() != null) {
+                            String key = RedisKey.USER_MBS.build(membership.getUserId());
+                            keyToMembershipIdMap.put(key, membership.getMembershipId());
+                        }
                     }
                     redisBatch.multiSetRemovePairs(longRedisTemplate, keyToMembershipIdMap);
                 },
@@ -143,31 +170,36 @@ public class MembershipRedisDao {
     }
 
     public void removeMembershipInfo(Long membershipId) {
-        redisGuard.safeWrite(
+        if (membershipId == null) return;
+        redisGuard.safeInvalidate(
                 () -> membershipRedisTemplate.delete(RedisKey.MBS_INFO.build(membershipId)),
                 "removeMembershipInfo for ID: " + membershipId
         );
     }
 
     public void saveAllMembershipIdsToTeam(List<Long> membershipIds, Long teamId) {
-        if (membershipIds == null || membershipIds.isEmpty()) return;
+        if (teamId == null || membershipIds == null || membershipIds.isEmpty()) return;
 
         redisGuard.safeWrite(
                 () -> {
+                    String key = RedisKey.MBS_IN_TEAMS.build(teamId);
                     Long[] idsArray = membershipIds.toArray(new Long[0]);
-                    longRedisTemplate.opsForSet().add(RedisKey.MBS_IN_TEAMS.build(teamId), idsArray);
+                    longRedisTemplate.opsForSet().add(key, idsArray);
+                    longRedisTemplate.expire(key, addJitter(RedisKey.MBS_IN_TEAMS.getTtl()));
                 },
                 "saveAllMembershipIdsToTeam for Team: " + teamId + " (" + membershipIds.size() + " IDs)"
         );
     }
 
     public void saveAllMembershipIdsToUser(List<Long> membershipIds, Long userId) {
-        if (membershipIds == null || membershipIds.isEmpty()) return;
+        if (userId == null || membershipIds == null || membershipIds.isEmpty()) return;
 
         redisGuard.safeWrite(
                 () -> {
+                    String key = RedisKey.USER_MBS.build(userId);
                     Long[] idsArray = membershipIds.toArray(new Long[0]);
-                    longRedisTemplate.opsForSet().add(RedisKey.USER_MBS.build(userId), idsArray);
+                    longRedisTemplate.opsForSet().add(key, idsArray);
+                    longRedisTemplate.expire(key, addJitter(RedisKey.USER_MBS.getTtl()));
                 },
                 "saveAllMembershipIdsToUser for User: " + userId + " (" + membershipIds.size() + " IDs)"
         );
@@ -176,7 +208,7 @@ public class MembershipRedisDao {
     public void removeMembershipInfoBatch(List<Long> membershipIds) {
         if (membershipIds == null || membershipIds.isEmpty()) return;
 
-        redisGuard.safeWrite(
+        redisGuard.safeInvalidate(
                 () -> {
                     List<String> keys = membershipIds.stream().map(RedisKey.MBS_INFO::build).toList();
                     membershipRedisTemplate.delete(keys);
@@ -185,23 +217,25 @@ public class MembershipRedisDao {
         );
     }
 
-    public void deleteMembershipIndexTeamKey( Long teamId){
-        if(teamId == null) return;
+    public void deleteMembershipIndexTeamKey(Long teamId) {
+        if (teamId == null) return;
 
-        redisGuard.safeWrite(
-                () -> membershipRedisTemplate.delete(RedisKey.MBS_IN_TEAMS.build(teamId)),
-        "deleteMembershipIndexTeamKey for Team: " + teamId
+        redisGuard.safeInvalidate(
+                () -> longRedisTemplate.delete(RedisKey.MBS_IN_TEAMS.build(teamId)),
+                "deleteMembershipIndexTeamKey for Team: " + teamId
         );
     }
 
-    public void saveMembershipInfoBatch(List<Membership> memberships) {
+    public void saveMembershipInfoBatch(List<CacheMembership> memberships) {
         if (memberships == null || memberships.isEmpty()) return;
 
         redisGuard.safeWrite(
                 () -> {
-                    Map<String, Membership> membershipMap = new HashMap<>();
-                    for (Membership membership : memberships) {
-                        membershipMap.put(RedisKey.MBS_INFO.build(membership.getMembershipId()), membership);
+                    Map<String, CacheMembership> membershipMap = new HashMap<>();
+                    for (CacheMembership membership : memberships) {
+                        if (membership != null && membership.getMembershipId() != null) {
+                            membershipMap.put(RedisKey.MBS_INFO.build(membership.getMembershipId()), membership);
+                        }
                     }
                     redisBatch.multiSetWithTtl(membershipRedisTemplate, membershipMap, addJitter(RedisKey.MBS_INFO.getTtl()));
                 },

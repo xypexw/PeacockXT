@@ -1,8 +1,9 @@
 package com.github.peacockxt.service.provider;
 
 import com.github.peacockxt.infrastructure.cache.PostRedisDao;
-import com.github.peacockxt.models.customexception.DatabaseException;
+import com.github.peacockxt.infrastructure.cache.models.CachePost;
 import com.github.peacockxt.models.Post;
+import com.github.peacockxt.models.customexception.DatabaseException;
 import com.github.peacockxt.repository.implementation.PostRepository;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,24 +21,32 @@ public class PostProvider {
     public boolean hasPost(Long postId) {
         return getPost(postId) != null;
     }
-    public Post getPost(Long postId) {
-        // 1. Check Cache
-        Post cachedPost = postRedisDao.getPostData(postId);
+
+    public CachePost getPost(Long postId) {
+        if (postId == null) return null;
+        CachePost cachedPost = postRedisDao.getPostData(postId);
         if (cachedPost != null) {
             return cachedPost;
         }
 
-        // 2. Cache Miss -> Query Database
         try {
-            // Use default JpaRepository
             Post post = postRepository.findById(postId).orElse(null);
-
-            // 3. If present in DB, repopulate into Cache
-            if (post != null) {
-                // Use single-element savePostBatch to update DATA without modifying ZSET index
-                postRedisDao.savePostBatch(Collections.singletonList(post));
+            if (post == null) {
+                return null;
             }
-            return post;
+            CachePost cachePost = CachePost.builder()
+                    .postId(post.getPostId())
+                    .title(post.getTitle())
+                    .description(post.getDescription())
+                    .status(post.getStatus())
+                    .createAt(post.getCreateAt())
+                    .updateAt(post.getUpdateAt())
+                    .createBy(post.getCreateBy())
+                    .updateBy(post.getUpdateBy())
+                    .teamId(post.getTeamId())
+                    .build();
+            postRedisDao.savePostBatch(Collections.singletonList(cachePost));
+            return cachePost;
         } catch (Exception e) {
             throw new DatabaseException("Failed to query Post from database for postId: " + postId, e);
         }

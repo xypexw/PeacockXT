@@ -1,7 +1,9 @@
 package com.github.peacockxt.service.message;
 
 import com.github.peacockxt.dto.event.InternalEvent;
-import com.github.peacockxt.dto.event.MessagePayload; // DTO bạn cần tạo (giống PostPayload)
+import com.github.peacockxt.dto.event.MessagePayload;
+import com.github.peacockxt.infrastructure.cache.MessageRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheMessage;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
 import com.github.peacockxt.models.Channel;
@@ -9,14 +11,13 @@ import com.github.peacockxt.models.Message;
 import com.github.peacockxt.policy.MessagePolicy;
 import com.github.peacockxt.repository.implementation.ChannelRepository;
 import com.github.peacockxt.repository.implementation.MessageRepository;
-import com.github.peacockxt.infrastructure.cache.MessageRedisDao;
 import com.github.peacockxt.service.SnowflakeIdGenerator;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 
@@ -44,25 +45,38 @@ public class CreateMessageService {
 
         localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(message, channelId));
 
+        CacheMessage cacheMessage = CacheMessage.builder()
+                .messageId(message.getMessageId())
+                .content(message.getContent())
+                .senderId(message.getSenderId())
+                .createAt(message.getCreateAt())
+                .updateAt(message.getUpdateAt())
+                .status(message.getStatus())
+                .replyToId(message.getReplyToId())
+                .channelId(channelId)
+                .build();
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                messageRedisDao.saveMessage(channelId, message);
+                messageRedisDao.saveMessage(channelId, cacheMessage);
             }
         });
     }
 
     private Message messageBuilder(Long senderId, String content, Long replyId, Long channelId) {
         Channel channel = channelRepository.getReferenceById(channelId);
+        LocalDateTime now = LocalDateTime.now();
         return Message.builder()
                 .messageId(snowflakeIdGenerator.nextId())
                 .content(content)
-                .createAt(LocalDateTime.now())
+                .createAt(now)
                 .replyToId(replyId)
                 .status(DEFAULT_STATUS)
-                .updateAt(LocalDateTime.now())
+                .updateAt(now)
                 .senderId(senderId)
                 .channel(channel)
+                .channelId(channelId)
                 .build();
     }
 

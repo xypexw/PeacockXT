@@ -2,13 +2,12 @@ package com.github.peacockxt.service.message;
 
 import com.github.peacockxt.dto.event.InternalEvent;
 import com.github.peacockxt.dto.event.MessagePayload;
+import com.github.peacockxt.infrastructure.cache.MessageRedisDao;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
 import com.github.peacockxt.models.Message;
 import com.github.peacockxt.policy.MessagePolicy;
 import com.github.peacockxt.repository.implementation.MessageRepository;
-import com.github.peacockxt.infrastructure.cache.MessageRedisDao;
-import com.github.peacockxt.service.provider.MessageProvider;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,7 +24,6 @@ public class EditMessageService {
 
     private final MessageRepository messageRepository;
     private final MessageRedisDao messageRedisDao;
-    private final MessageProvider messageProvider;
     private final MessagePolicy messagePolicy;
     private final LocalEventDispatcher localEventDispatcher;
     private final String event_name = "UPDATE_MESSAGE";
@@ -33,14 +31,14 @@ public class EditMessageService {
 
     @Transactional
     public void editMessage(Long messageId, String content, Long channelId) {
-        Message message = messageProvider.getMessage(messageId);
+        Message message = messageRepository.getMessagesByMessageId(messageId);
         messagePolicy.validateCanEditMessage(channelId, message);
         message.setStatus(EDITED_STATUS);
         message.setUpdateAt(LocalDateTime.now());
         message.setContent(content);
         messageRepository.save(message);
 
-        localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(message,channelId));
+        localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(message, channelId));
 
         log.debug("Message persisted to DB: messageId={}", message.getMessageId());
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -51,19 +49,18 @@ public class EditMessageService {
         });
     }
 
-    InternalEvent<MessagePayload> internalEventBuilder(Message message , long channelId){
-           MessagePayload messagePayload = MessagePayload.builder()
-                   .messageId(message.getMessageId())
-                   .status(message.getStatus())
-                   .updateAt(message.getUpdateAt())
-                   .content(message.getContent())
-                   .channelId(channelId)
-                   .build();
-           return InternalEvent.<MessagePayload>builder()
-                   .eventType(event_name)
-                   .payload(messagePayload)
-                   .destination(WebsocketDestination.CHANNEL.getDestination(channelId))
-                   .build();
+    InternalEvent<MessagePayload> internalEventBuilder(Message message, long channelId) {
+        MessagePayload messagePayload = MessagePayload.builder()
+                .messageId(message.getMessageId())
+                .status(message.getStatus())
+                .updateAt(message.getUpdateAt())
+                .content(message.getContent())
+                .channelId(channelId)
+                .build();
+        return InternalEvent.<MessagePayload>builder()
+                .eventType(event_name)
+                .payload(messagePayload)
+                .destination(WebsocketDestination.CHANNEL.getDestination(channelId))
+                .build();
     }
-
 }

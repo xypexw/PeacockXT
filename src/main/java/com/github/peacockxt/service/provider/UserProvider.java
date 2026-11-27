@@ -1,10 +1,10 @@
 package com.github.peacockxt.service.provider;
 
+import com.github.peacockxt.infrastructure.cache.UserSessionRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheUser;
 import com.github.peacockxt.models.User;
 import com.github.peacockxt.models.customexception.DatabaseException;
 import com.github.peacockxt.repository.implementation.UserRepository;
-import com.github.peacockxt.infrastructure.cache.UserSessionRedisDao;
-import com.github.peacockxt.service.RedisRetryManager;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,48 +16,41 @@ public class UserProvider {
 
     private final UserRepository userRepository;
     private final UserSessionRedisDao userSessionRedisDao;
-    private final RedisRetryManager redisRetryManager;
 
     public boolean hasUser(Long userId) {
-        User userInCache = hasUserInCache(userId);
-        if (userInCache != null) return true;
+        return getUser(userId) != null;
+    }
+
+    public CacheUser getUser(Long userId) {
+        if (userId == null) return null;
+        CacheUser userInCache = userSessionRedisDao.getUserProfile(userId);
+        if (userInCache != null) return userInCache;
 
         try {
             User user = userRepository.getUserByUserId(userId);
-            if (user == null) return false;
-            saveUserProfileToCache(user);
-            return true;
+            if (user == null) return null;
+
+            CacheUser cacheUser = CacheUser.builder()
+                    .userId(user.getUserId())
+                    .userName(user.getUserName())
+                    .firstName(user.getFirstName())
+                    .lastName(user.getLastName())
+                    .email(user.getEmail())
+                    .password(user.getPassword())
+                    .systemRole(user.getSystemRole())
+                    .config(user.getConfig())
+                    .status(user.getStatus())
+                    .updateAt(user.getUpdateAt())
+                    .createAt(user.getCreateAt())
+                    .createBy(user.getCreateBy())
+                    .updateBy(user.getUpdateBy())
+                    .avatarUrl(user.getAvatarUrl())
+                    .bio(user.getBio())
+                    .build();
+            userSessionRedisDao.saveUserProfile(user.getUserId(), cacheUser);
+            return cacheUser;
         } catch (Exception e) {
             throw new DatabaseException("Failed to query user from database", e);
-        }
-    }
-
-    public User getUser(Long userId) {
-        User userInCache = hasUserInCache(userId);
-        if (userInCache != null) return userInCache;
-        try {
-            return userRepository.getUserByUserId(userId);
-        }
-        catch (Exception e) {
-            throw new DatabaseException("Failed to query user from database", e);
-        }
-    }
-
-    private User hasUserInCache(Long userId) {
-        try {
-            return userSessionRedisDao.getUserProfile(userId);
-        } catch (Exception e) {
-            log.error("Failed to read user from Redis: {}", e.getMessage(), e);
-            return null;
-        }
-    }
-
-    private void saveUserProfileToCache(User user) {
-        try {
-            userSessionRedisDao.saveUserProfile(user.getUserId(), user);
-        } catch (Exception e) {
-            log.warn("Failed to cache user profile, queuing for retry: {}", e.getMessage());
-            redisRetryManager.execute(() -> userSessionRedisDao.saveUserProfile(user.getUserId(), user));
         }
     }
 }

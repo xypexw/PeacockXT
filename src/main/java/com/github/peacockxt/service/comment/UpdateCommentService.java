@@ -3,14 +3,13 @@ package com.github.peacockxt.service.comment;
 import com.github.peacockxt.dto.event.CommentPayload;
 import com.github.peacockxt.dto.event.InternalEvent;
 import com.github.peacockxt.infrastructure.cache.CommentRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheMembership;
+import com.github.peacockxt.infrastructure.cache.models.CachePost;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
 import com.github.peacockxt.models.Comment;
-import com.github.peacockxt.models.Membership;
-import com.github.peacockxt.models.Post;
 import com.github.peacockxt.policy.CommentPolicy;
 import com.github.peacockxt.repository.implementation.CommentRepository;
-import com.github.peacockxt.service.provider.CommentProvider;
 import com.github.peacockxt.service.provider.MembershipProvider;
 import com.github.peacockxt.service.provider.PostProvider;
 import lombok.AllArgsConstructor;
@@ -27,7 +26,6 @@ public class UpdateCommentService {
     private final CommentPolicy commentPolicy;
     private final CommentRepository commentRepository;
     private final CommentRedisDao commentRedisDao;
-    private final CommentProvider commentProvider;
     private final PostProvider postProvider;
     private final MembershipProvider membershipProvider;
 
@@ -38,15 +36,12 @@ public class UpdateCommentService {
 
     @Transactional
     public void updateComment(Long userId, Long membershipId, Long commentId, String newContent, Long postId) {
-        // 1. Fetch Data
-        Comment comment = commentProvider.getComment(commentId);
-        Membership membership = membershipProvider.getMembership(membershipId);
-        Post post = postProvider.getPost(postId);
+        Comment comment = commentRepository.getCommentByCommentId(commentId);
+        CacheMembership membership = membershipProvider.getMembership(membershipId);
+        CachePost post = postProvider.getPost(postId);
 
-        // 2. policy checking
         commentPolicy.validateUpdateComment(userId, membership, post, comment);
 
-        // 3. Update Data
         comment.setContent(newContent);
         comment.setStatus(EDITED_STATUS);
         comment.setUpdateAt(LocalDateTime.now());
@@ -54,10 +49,8 @@ public class UpdateCommentService {
 
         commentRepository.save(comment);
 
-        // 4. Push Event to RabbitMQ ( Edited Comment Notification )
         localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(comment, postId));
 
-        // 5. Cache Sync after Commit DB Successfully
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {

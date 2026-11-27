@@ -1,18 +1,19 @@
 package com.github.peacockxt.service.channel;
 
-import com.github.peacockxt.dto.event.ChannelPayload; // Nhớ tạo DTO này nhé
+import com.github.peacockxt.dto.event.ChannelPayload;
 import com.github.peacockxt.dto.event.InternalEvent;
 import com.github.peacockxt.infrastructure.cache.TeamChannelRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheChannel;
+import com.github.peacockxt.infrastructure.cache.models.CacheMembership;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
 import com.github.peacockxt.models.Channel;
-import com.github.peacockxt.models.customexception.BusinessLogicException;
-import com.github.peacockxt.models.Membership;
 import com.github.peacockxt.models.Team;
+import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.repository.implementation.ChannelRepository;
 import com.github.peacockxt.repository.implementation.TeamRepository;
-import com.github.peacockxt.service.provider.MembershipProvider;
 import com.github.peacockxt.service.SnowflakeIdGenerator;
+import com.github.peacockxt.service.provider.MembershipProvider;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,14 +37,14 @@ public class CreateChannelService {
     private final LocalEventDispatcher localEventDispatcher;
 
     @Transactional
-    public void createChannel(String name, String description, Long userId, Long teamId , Long membershipId) {
+    public void createChannel(String name, String description, Long userId, Long teamId, Long membershipId) {
 
-        Membership membership = membershipProvider.getMembership(membershipId);
-        if(membership == null) {
+        CacheMembership membership = membershipProvider.getMembership(membershipId);
+        if (membership == null) {
             throw new BusinessLogicException("Membership not found");
         }
-        if(!membership.getUserId().equals(userId) || !membership.getTeamId().equals(teamId)) {
-            throw  new BusinessLogicException("UserId or Team Id in Membership mismatch");
+        if (!membership.getUserId().equals(userId) || !membership.getTeamId().equals(teamId)) {
+            throw new BusinessLogicException("UserId or Team Id in Membership mismatch");
         }
 
         Channel channel = channelBuilder(name, description, userId, teamId);
@@ -51,11 +52,23 @@ public class CreateChannelService {
 
         localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(channel, teamId));
 
+        CacheChannel cacheChannel = CacheChannel.builder()
+                .channelId(channel.getChannelId())
+                .name(channel.getName())
+                .description(channel.getDescription())
+                .status(channel.getStatus())
+                .createBy(channel.getCreateBy())
+                .updateBy(channel.getUpdateBy())
+                .createAt(channel.getCreateAt())
+                .updateAt(channel.getUpdateAt())
+                .teamId(teamId)
+                .build();
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                teamChannelRedisDao.addChannelToTeam(teamId, channel.getChannelId(), channel.getChannelId());
-                teamChannelRedisDao.saveChannelInfo(teamId, channel);
+                teamChannelRedisDao.addChannelToTeam(teamId, channel.getChannelId());
+                teamChannelRedisDao.saveChannelInfo(channel.getChannelId(), cacheChannel);
             }
         });
     }
@@ -72,9 +85,9 @@ public class CreateChannelService {
                 .updateBy(userId)
                 .status(DEFAULT_STATUS)
                 .team(team)
+                .teamId(teamId)
                 .build();
     }
-
 
     private InternalEvent<ChannelPayload> internalEventBuilder(Channel channel, Long teamId) {
         ChannelPayload payload = ChannelPayload.builder()

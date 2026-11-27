@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MembershipRepository extends JpaRepository<Membership,Long> {
@@ -16,6 +17,9 @@ public interface MembershipRepository extends JpaRepository<Membership,Long> {
 
     @Query("SELECT m.membershipId FROM Membership m WHERE m.team.teamId = :teamId")
     List<Long> findMembershipIdsByTeamId(@Param("teamId") Long teamId);
+
+    @Query("SELECT m FROM Membership m WHERE m.userId = :userId AND m.teamId = :teamId")
+    Optional<Membership> findByUserIdAndTeamId(@Param("userId") Long userId, @Param("teamId") Long teamId);
 
     @Query("SELECT m FROM Membership m WHERE m.membershipId IN :membershipIds")
     List<Membership> findMembershipsByMembershipIds(@Param("membershipIds") List<Long> membershipIds);

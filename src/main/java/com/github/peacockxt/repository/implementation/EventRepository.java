@@ -27,6 +27,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     @Modifying
     @Transactional
-    @Query("UPDATE Event e SET e.numberAttend = e.numberAttend + :number WHERE e.eventId = :eventId")
+    @Query("UPDATE Event e SET e.numberAttend = COALESCE(e.numberAttend, 0) + :number WHERE e.eventId = :eventId")
     void increasingAttended(@Param("eventId") Long eventId ,@Param("number") int number );
 }

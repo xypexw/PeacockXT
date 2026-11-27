@@ -2,22 +2,19 @@ package com.github.peacockxt.service.event;
 
 import com.github.peacockxt.dto.event.EventPayload;
 import com.github.peacockxt.dto.event.InternalEvent;
+import com.github.peacockxt.infrastructure.cache.EventRedisDao;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
-import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.models.Event;
+import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.repository.implementation.EventRepository;
-import com.github.peacockxt.infrastructure.cache.EventRedisDao;
 import com.github.peacockxt.service.provider.TeamProvider;
-import com.github.peacockxt.service.RedisRetryManager;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
-
-import java.util.List;
 
 @Service
 @Slf4j
@@ -30,7 +27,6 @@ public class DeleteEventService {
     private final EventRepository eventRepository;
     private final EventRedisDao eventRedisDao;
     private final TeamProvider teamProvider;
-    private final RedisRetryManager redisRetryManager;
 
     @Transactional
     public void deleteEvent(Long teamId, Long eventId) {
@@ -38,8 +34,8 @@ public class DeleteEventService {
             throw new BusinessLogicException("Team does not exist");
         }
 
-        Event event = getEvent(eventId, teamId);
-        if (event == null) {
+        Event event = eventRepository.findById(eventId).orElse(null);
+        if (event == null || !teamId.equals(event.getTeamId())) {
             throw new BusinessLogicException("Event does not exist");
         }
 
@@ -47,7 +43,6 @@ public class DeleteEventService {
         eventRepository.save(event);
 
         localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(event, teamId));
-
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -57,19 +52,7 @@ public class DeleteEventService {
         });
     }
 
-    private Event getEvent(Long eventId , Long teamId) {
-        Event event = eventRedisDao.getEventData(eventId);
-        if (event != null) {
-            return event;
-        }
-        event = eventRepository.findById(eventId).orElse(null);
-        if( event != null ) {
-            eventRedisDao.saveEventBatch(teamId, List.of(event));
-        }
-        return event;
-    }
-
-    private InternalEvent<EventPayload> internalEventBuilder(Event event , Long teamId ) {
+    private InternalEvent<EventPayload> internalEventBuilder(Event event, Long teamId) {
         EventPayload payload = EventPayload.builder()
                 .eventId(event.getEventId())
                 .status(STATUS_DELETED)

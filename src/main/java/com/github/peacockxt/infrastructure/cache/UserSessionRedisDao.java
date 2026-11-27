@@ -1,6 +1,6 @@
 package com.github.peacockxt.infrastructure.cache;
 
-import com.github.peacockxt.models.User;
+import com.github.peacockxt.infrastructure.cache.models.CacheUser;
 import com.github.peacockxt.infrastructure.constants.RedisKey;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -13,7 +13,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @RequiredArgsConstructor
 public class UserSessionRedisDao {
 
-    private final RedisTemplate<String, User> userRedisTemplate;
+    private final RedisTemplate<String, CacheUser> userRedisTemplate;
     private final RedisTemplate<String, Long> userIdRedisTemplate;
     private final RedisTemplate<String, String> stringRedisTemplate;
     private final RedisOperationGuard redisGuard;
@@ -28,13 +28,19 @@ public class UserSessionRedisDao {
     // ==========================================
 
     public void mapUsernameToId(String username, Long userId) {
+        if (username == null || userId == null) return;
         redisGuard.safeWrite(
-                () -> userIdRedisTemplate.opsForValue().set(RedisKey.USER_MAPPING_USERNAME.build(username), userId),
+                () -> userIdRedisTemplate.opsForValue().set(
+                        RedisKey.USER_MAPPING_USERNAME.build(username),
+                        userId,
+                        addJitter(RedisKey.USER_MAPPING_USERNAME.getTtl())
+                ),
                 "mapUsernameToId: username=" + username + ", userId=" + userId
         );
     }
 
     public Long getIdByUsername(String username) {
+        if (username == null) return null;
         return redisGuard.safeRead(
                 () -> userIdRedisTemplate.opsForValue().get(RedisKey.USER_MAPPING_USERNAME.build(username)),
                 null,
@@ -47,14 +53,16 @@ public class UserSessionRedisDao {
     // ==========================================
 
     public boolean hasUserProfile(Long userId) {
-        return redisGuard.safeRead(
-                () -> Boolean.TRUE.equals(userIdRedisTemplate.hasKey(RedisKey.USER_PROFILE.build(userId))),
+        if (userId == null) return false;
+        return Boolean.TRUE.equals(redisGuard.safeRead(
+                () -> userRedisTemplate.hasKey(RedisKey.USER_PROFILE.build(userId)),
                 false,
                 "hasUserProfile: userId=" + userId
-        );
+        ));
     }
 
-    public void saveUserProfile(Long userId, User user) {
+    public void saveUserProfile(Long userId, CacheUser user) {
+        if (userId == null || user == null) return;
         redisGuard.safeWrite(
                 () -> userRedisTemplate.opsForValue().set(
                         RedisKey.USER_PROFILE.build(userId),
@@ -65,7 +73,8 @@ public class UserSessionRedisDao {
         );
     }
 
-    public User getUserProfile(Long userId) {
+    public CacheUser getUserProfile(Long userId) {
+        if (userId == null) return null;
         return redisGuard.safeRead(
                 () -> userRedisTemplate.opsForValue().get(RedisKey.USER_PROFILE.build(userId)),
                 null,
@@ -74,7 +83,8 @@ public class UserSessionRedisDao {
     }
 
     public void deleteUserProfile(Long userId) {
-        redisGuard.safeWrite(
+        if (userId == null) return;
+        redisGuard.safeInvalidate(
                 () -> userRedisTemplate.delete(RedisKey.USER_PROFILE.build(userId)),
                 "deleteUserProfile: userId=" + userId
         );
@@ -85,24 +95,22 @@ public class UserSessionRedisDao {
     // ==========================================
 
     public void saveSessionToken(long userId, String accessToken) {
-        // APISIX dùng key: "peacockxt:session:token:" + token
         redisGuard.safeWrite(
                 () -> stringRedisTemplate.opsForValue().set(
                         RedisKey.SESSION_TOKEN.build(accessToken),
                         String.valueOf(userId),
-                        Duration.ofMinutes(15) // AT live 15 mins
+                        RedisKey.SESSION_TOKEN.getTtl()
                 ),
                 "saveSessionToken: userId=" + userId
         );
     }
 
     public void saveRefreshToken(Long userId, String refreshToken) {
-        // APISIX dùng key: "peacockxt:session:refresh_token:" + token
         redisGuard.safeWrite(
                 () -> stringRedisTemplate.opsForValue().set(
                         RedisKey.REFRESH_TOKEN.build(refreshToken),
                         String.valueOf(userId),
-                        Duration.ofDays(7) // RT live 7 days
+                        RedisKey.REFRESH_TOKEN.getTtl()
                 ),
                 "saveRefreshToken: userId=" + userId
         );
@@ -129,6 +137,7 @@ public class UserSessionRedisDao {
     // ==========================================
 
     public void markUserOnline(Long userId) {
+        if (userId == null) return;
         redisGuard.safeWrite(
                 () -> stringRedisTemplate.opsForValue().set(
                         RedisKey.USER_ONLINE.build(userId),
@@ -140,10 +149,11 @@ public class UserSessionRedisDao {
     }
 
     public boolean isUserOnline(Long userId) {
-        return redisGuard.safeRead(
-                () -> Boolean.TRUE.equals(stringRedisTemplate.hasKey(RedisKey.USER_ONLINE.build(userId))),
+        if (userId == null) return false;
+        return Boolean.TRUE.equals(redisGuard.safeRead(
+                () -> stringRedisTemplate.hasKey(RedisKey.USER_ONLINE.build(userId)),
                 false,
                 "isUserOnline: userId=" + userId
-        );
+        ));
     }
 }

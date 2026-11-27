@@ -1,10 +1,10 @@
 package com.github.peacockxt.service.provider;
 
+import com.github.peacockxt.infrastructure.cache.TeamChannelRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheChannel;
 import com.github.peacockxt.models.Channel;
 import com.github.peacockxt.models.customexception.DatabaseException;
 import com.github.peacockxt.repository.implementation.ChannelRepository;
-import com.github.peacockxt.infrastructure.cache.TeamChannelRedisDao;
-import com.github.peacockxt.service.RedisRetryManager;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,31 +16,28 @@ public class ChannelProvider {
 
     private final ChannelRepository channelRepository;
     private final TeamChannelRedisDao teamChannelRedisDao;
-    private final RedisRetryManager redisRetryManager;
 
-    public Channel getChannel(Long channelId) {
+    public CacheChannel getChannel(Long channelId) {
+        if (channelId == null) return null;
         try {
-            // 1. Get from Cache
-            Channel cachedChannel = teamChannelRedisDao.getChannelInfo(channelId);
+            CacheChannel cachedChannel = teamChannelRedisDao.getChannelInfo(channelId);
             if (cachedChannel != null) {
                 return cachedChannel;
             }
-            // 2. Cache Miss -> Query DB
             Channel channel = channelRepository.getChannelByChannelId(channelId);
-            // If not found in DB either -> Return null
             if (channel == null) {
                 return null;
             }
-            // 3. Found in DB -> Save to cache and return
-            saveChannelInCache(channel);
-            return channel;
-
+            CacheChannel cacheChannel = toCacheChannel(channel);
+            saveChannelInCache(cacheChannel);
+            return cacheChannel;
         } catch (Exception e) {
             throw new DatabaseException("Failed to query Channel from database for channelId: " + channelId, e);
         }
     }
 
     public boolean hasChannel(Long channelId) {
+        if (channelId == null) return false;
         if (hasChannelInCache(channelId)) {
             return true;
         }
@@ -49,8 +46,7 @@ public class ChannelProvider {
             if (channel == null) {
                 return false;
             }
-            // Found in DB -> Backfill Cache and return true
-            saveChannelInCache(channel);
+            saveChannelInCache(toCacheChannel(channel));
             return true;
         } catch (Exception e) {
             throw new DatabaseException("Failed to query Channel from database for channelId: " + channelId, e);
@@ -61,7 +57,21 @@ public class ChannelProvider {
         return teamChannelRedisDao.hasChannelInfo(channelId);
     }
 
-    private void saveChannelInCache(Channel channel) {
+    private void saveChannelInCache(CacheChannel channel) {
         teamChannelRedisDao.saveChannelInfo(channel.getChannelId(), channel);
+    }
+
+    private CacheChannel toCacheChannel(Channel channel) {
+        return CacheChannel.builder()
+                .channelId(channel.getChannelId())
+                .name(channel.getName())
+                .description(channel.getDescription())
+                .status(channel.getStatus())
+                .createBy(channel.getCreateBy())
+                .updateBy(channel.getUpdateBy())
+                .createAt(channel.getCreateAt())
+                .updateAt(channel.getUpdateAt())
+                .teamId(channel.getTeamId())
+                .build();
     }
 }

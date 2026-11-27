@@ -45,4 +45,7 @@ public class Message {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn( name = "channel_id", nullable = false)
     private Channel channel;
+
+    @Column(name = "channel_id", insertable = false, updatable = false)
+    private Long channelId;
 }

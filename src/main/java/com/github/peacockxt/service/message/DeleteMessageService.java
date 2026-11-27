@@ -8,7 +8,6 @@ import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
 import com.github.peacockxt.models.Message;
 import com.github.peacockxt.policy.MessagePolicy;
 import com.github.peacockxt.repository.implementation.MessageRepository;
-import com.github.peacockxt.service.provider.MessageProvider;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,14 +27,13 @@ public class DeleteMessageService {
     private static final String EVENT_NAME = "DELETE_MESSAGE";
     private final MessageRepository messageRepository;
     private final MessageRedisDao messageRedisDao;
-    private final MessageProvider messageProvider;
     private final MessagePolicy messagePolicy;
 
     private final LocalEventDispatcher localEventDispatcher;
 
     @Transactional
     public void deleteMessage(Long channelId, Long messageId) {
-        Message message = messageProvider.getMessage(messageId);
+        Message message = messageRepository.getMessagesByMessageId(messageId);
 
         messagePolicy.validateCanDeleteMessage(channelId, message);
 
@@ -60,8 +58,8 @@ public class DeleteMessageService {
         MessagePayload payload = MessagePayload.builder()
                 .messageId(message.getMessageId())
                 .channelId(channelId)
-                .status(message.getStatus())   // "DELETED"
-                .content(message.getContent()) // "Message has been deleted"
+                .status(message.getStatus())
+                .content(message.getContent())
                 .build();
 
         return InternalEvent.<MessagePayload>builder()

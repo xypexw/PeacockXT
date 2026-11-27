@@ -2,15 +2,15 @@ package com.github.peacockxt.service.event;
 
 import com.github.peacockxt.dto.event.EventPayload;
 import com.github.peacockxt.dto.event.InternalEvent;
+import com.github.peacockxt.infrastructure.cache.EventRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheEvent;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
-import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.models.Event;
 import com.github.peacockxt.models.Team;
+import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.repository.implementation.EventRepository;
 import com.github.peacockxt.repository.implementation.TeamRepository;
-import com.github.peacockxt.infrastructure.cache.EventRedisDao;
-import com.github.peacockxt.service.RedisRetryManager;
 import com.github.peacockxt.service.SnowflakeIdGenerator;
 import com.github.peacockxt.service.provider.TeamProvider;
 import jakarta.transaction.Transactional;
@@ -35,7 +35,6 @@ public class CreateEventService {
     private final EventRedisDao eventRedisDao;
     private final TeamRepository teamRepository;
     private final TeamProvider teamProvider;
-    private final RedisRetryManager redisRetryManager;
     private final SnowflakeIdGenerator snowflakeIdGenerator;
 
     @Transactional
@@ -51,15 +50,23 @@ public class CreateEventService {
 
         localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(event, teamId));
 
+        CacheEvent cacheEvent = CacheEvent.builder()
+                .eventId(event.getEventId())
+                .title(event.getTitle())
+                .content(event.getContent())
+                .status(event.getStatus())
+                .createBy(event.getCreateBy())
+                .createAt(event.getCreateAt())
+                .startTime(event.getStartTime())
+                .endTime(event.getEndTime())
+                .numberAttend(event.getNumberAttend())
+                .teamId(teamId)
+                .build();
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                try{
-                    eventRedisDao.saveEvent(teamId, event);
-                }
-                catch (Exception e){
-                    redisRetryManager.execute( () -> eventRedisDao.saveEvent(teamId, event) );
-                }
+                eventRedisDao.saveEvent(teamId, cacheEvent);
             }
         });
     }
@@ -78,10 +85,11 @@ public class CreateEventService {
                 .status(DEFAULT_STATUS)
                 .createBy(creatorId)
                 .team(team)
+                .teamId(teamId)
                 .build();
     }
 
-    private InternalEvent<EventPayload> internalEventBuilder(Event event , Long teamId ) {
+    private InternalEvent<EventPayload> internalEventBuilder(Event event, Long teamId) {
         EventPayload payload = EventPayload.builder()
                 .eventId(event.getEventId())
                 .title(event.getTitle())
@@ -98,5 +106,4 @@ public class CreateEventService {
                 .destination(WebsocketDestination.TEAM.getDestination(teamId))
                 .build();
     }
-
 }

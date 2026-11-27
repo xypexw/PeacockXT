@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "event",
         indexes = {
-                @Index(name = "idx_team_create", columnList = "team_id, create_at")
+                @Index(name = "idx_event_team_id_status", columnList = "team_id, event_id, status")
         }
 )
 @Builder
@@ -51,6 +51,9 @@ public class Event {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
+
+    @Column(name = "team_id", insertable = false, updatable = false)
+    private Long teamId;
 
 }
 

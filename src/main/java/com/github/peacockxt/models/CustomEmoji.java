@@ -13,6 +13,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Table(
         name = "custom_emoji",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_team_emoji_name", columnNames = {"team_id", "emoji_name"})
+        },
         indexes = {
                 @Index(name = "idx_team_emoji", columnList = "team_id, emoji_name")
         }
@@ -23,7 +26,7 @@ public class CustomEmoji {
     @Column(name = "emoji_id")
     private Long emojiId;
 
-    @Column(name = "emoji_name", nullable = false , unique = true )
+    @Column(name = "emoji_name", nullable = false)
     private String emojiName;
 
     // exp : https://stogare.domain.com/bucket/team_id/emoji_name.png
@@ -37,6 +40,9 @@ public class CustomEmoji {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
+
+    @Column(name = "team_id", insertable = false, updatable = false)
+    private Long teamId;
 
     @Builder.Default
     @Column(name = "status", nullable = false, columnDefinition = "VARCHAR(50) DEFAULT 'DEFAULT'")

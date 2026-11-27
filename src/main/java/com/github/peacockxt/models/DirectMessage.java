@@ -50,4 +50,7 @@ public class DirectMessage {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id", nullable = false)
     private PrivateSession privateSession;
+
+    @Column(name = "session_id", insertable = false, updatable = false)
+    private Long sessionId;
 }

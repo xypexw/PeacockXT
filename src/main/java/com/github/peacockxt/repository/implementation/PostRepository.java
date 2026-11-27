@@ -13,7 +13,7 @@ import java.util.List;
 public interface PostRepository extends JpaRepository<Post,Long> {
     @Query("select p from Post p where p.postId IN :postIds")
     List<Post> getPostsByPostIdIn(@Param("postIds")List<Long> postIds);
-    @Query("Select p.postId from Post p where p.postId < :postId and p.team.teamId = :teamId and p.status != 'DELETE' " +
+    @Query("Select p.postId from Post p where p.postId < :postId and p.team.teamId = :teamId and p.status != 'DELETED' " +
             " ORDER BY p.postId DESC ")
     List<Long> findPostIdByTeamIdAndPostIdLessThanOrderByPostIdDesc(@Param("teamId") Long teamId,
                                                     @Param("postId") Long postId ,

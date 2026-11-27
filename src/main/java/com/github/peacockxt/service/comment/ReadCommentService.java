@@ -2,9 +2,10 @@ package com.github.peacockxt.service.comment;
 
 import com.github.peacockxt.dto.response.CommentResponse;
 import com.github.peacockxt.infrastructure.cache.CommentRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheComment;
+import com.github.peacockxt.infrastructure.cache.models.CacheMembership;
+import com.github.peacockxt.infrastructure.cache.models.CachePost;
 import com.github.peacockxt.models.Comment;
-import com.github.peacockxt.models.Membership;
-import com.github.peacockxt.models.Post;
 import com.github.peacockxt.policy.CommentPolicy;
 import com.github.peacockxt.repository.implementation.CommentRepository;
 import com.github.peacockxt.service.provider.MembershipProvider;
@@ -28,78 +29,95 @@ public class ReadCommentService {
     private final int defaultLimit = 50;
     private final String deleteStatus = "DELETED";
 
-    public List<CommentResponse> readComment(Long postId , Long teamId , Long userId , Long membershipId , Long cursorId ){
-        Post post = postProvider.getPost(postId);
-        Membership  membership = membershipProvider.getMembership(membershipId);
+    public List<CommentResponse> readComment(Long postId, Long teamId, Long userId, Long membershipId, Long cursorId) {
+        CachePost post = postProvider.getPost(postId);
+        CacheMembership membership = membershipProvider.getMembership(membershipId);
 
-        commentPolicy.validateReadComment(userId,teamId,membership,post);
+        commentPolicy.validateReadComment(userId, teamId, membership, post);
 
-        List<Long> commentIds = getCommentIds(postId,cursorId);
-        List<Comment> commentList = getCommentInfo(commentIds);
+        List<Long> commentIds = getCommentIds(postId, cursorId);
+        if (commentIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<CacheComment> commentList = getCommentInfo(commentIds);
         List<Long> replyIds = replyIdsOfCommentList(commentList);
-        Map<Long,Comment> replyComment = new HashMap<>();
-        if(!replyIds.isEmpty()){
+        Map<Long, CacheComment> replyComment = Collections.emptyMap();
+        if (!replyIds.isEmpty()) {
             replyComment = commentMapConverter(getCommentInfo(replyIds));
         }
-        return commentResponseListBuilder(commentList,replyComment);
+        return commentResponseListBuilder(commentList, replyComment);
     }
 
-    private List<Long> getCommentIds(Long postId , Long cursorId){
-        Set<Long> cacheCommentIds = commentRedisDao.getCommentIdsBeforeCursor(postId,cursorId,defaultLimit);
-        List<Long> commentIds = new ArrayList<>(cacheCommentIds);
-        if(!commentIds.isEmpty()){
-            return  commentIds;
+    private List<Long> getCommentIds(Long postId, Long cursorId) {
+        Set<Long> cacheCommentIds = commentRedisDao.getCommentIdsBeforeCursor(postId, cursorId, defaultLimit);
+        if (cacheCommentIds != null && !cacheCommentIds.isEmpty()) {
+            return new ArrayList<>(cacheCommentIds);
         }
-        Pageable pageable = PageRequest.of(0,defaultLimit );
-        if(cursorId==null){
-            cursorId = Long.MAX_VALUE;
-            pageable =  PageRequest.of(0,cacheIndexLimit);
+
+        if (cursorId == null) {
+            Pageable pageable = PageRequest.of(0, cacheIndexLimit);
+            List<Long> commentIds = commentRepository.getCommentByCommentIdsByCursorId(Long.MAX_VALUE, postId, pageable);
+            if (commentIds == null || commentIds.isEmpty()) {
+                return Collections.emptyList();
+            }
+            commentRedisDao.saveCommentIndexesBatch(postId, commentIds);
+            return commentIds.subList(0, Math.min(defaultLimit, commentIds.size()));
+        } else {
+            Pageable pageable = PageRequest.of(0, defaultLimit);
+            List<Long> commentIds = commentRepository.getCommentByCommentIdsByCursorId(cursorId, postId, pageable);
+            return (commentIds == null) ? Collections.emptyList() : commentIds;
         }
-        commentIds = commentRepository.getCommentByCommentIdsByCursorId(cursorId,postId,pageable);
-        if(cursorId.equals(Long.MAX_VALUE)) commentRedisDao.saveCommentIndexesBatch(postId,commentIds);
-        return   commentIds.subList(0,Math.min(defaultLimit,commentIds.size()));
     }
 
-    private List<Comment> getCommentInfo(List<Long> commentIds ){
-        List<Comment> comments = commentRedisDao.getCommentsBatch(commentIds);
+    private List<CacheComment> getCommentInfo(List<Long> commentIds) {
+        if (commentIds == null || commentIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<CacheComment> cached = commentRedisDao.getCommentsBatch(commentIds);
+        Map<Long, CacheComment> commentMap = new HashMap<>(commentIds.size());
+        if (cached != null) {
+            for (CacheComment c : cached) {
+                if (c != null) {
+                    commentMap.put(c.getCommentId(), c);
+                }
+            }
+        }
+
         List<Long> missingIds = new ArrayList<>();
-        Map<Long,Comment> commentMap = new HashMap<>();
-        for(int i=0;i<comments.size();i++){
-            if(comments.get(i)==null){
-                missingIds.add(commentIds.get(i));
+        for (Long id : commentIds) {
+            if (!commentMap.containsKey(id)) {
+                missingIds.add(id);
             }
         }
 
-        if (missingIds.isEmpty()) {
-            return comments;
-        }
-
-        List<Comment> missingComments = commentRepository.getCommentByCommentIdIn(missingIds);
-        for(Comment comment : missingComments){
-            commentMap.put(comment.getCommentId(),comment);
-        }
-
-        if (!missingComments.isEmpty()) {
-            commentRedisDao.saveCommentBatch(missingComments);
-        }
-
-        List<Comment> result = new ArrayList<>();
-
-        for(int i=0;i<comments.size();i++){
-            Comment comment = comments.get(i);
-            if(comment==null){
-                comment = commentMap.get(commentIds.get(i));
+        if (!missingIds.isEmpty()) {
+            List<Comment> missingComments = commentRepository.getCommentByCommentIdIn(missingIds);
+            List<CacheComment> toCache = new ArrayList<>(missingComments.size());
+            for (Comment entity : missingComments) {
+                CacheComment cacheComment = toCacheComment(entity);
+                commentMap.put(cacheComment.getCommentId(), cacheComment);
+                toCache.add(cacheComment);
             }
-            if(comment!=null)
+            if (!toCache.isEmpty()) {
+                commentRedisDao.saveCommentBatch(toCache);
+            }
+        }
+
+        List<CacheComment> result = new ArrayList<>(commentIds.size());
+        for (Long id : commentIds) {
+            CacheComment comment = commentMap.get(id);
+            if (comment != null) {
                 result.add(comment);
+            }
         }
         return result;
     }
 
-    private List<Long> replyIdsOfCommentList(List<Comment> comments){
+    private List<Long> replyIdsOfCommentList(List<CacheComment> comments) {
         List<Long> replyToIds = new ArrayList<>();
         Set<Long> seenIds = new HashSet<>();
-        for (Comment comment : comments) {
+        for (CacheComment comment : comments) {
             if (comment != null) {
                 Long replyToId = comment.getReplyToId();
                 if (replyToId != null && seenIds.add(replyToId)) {
@@ -107,23 +125,22 @@ public class ReadCommentService {
                 }
             }
         }
-        return  replyToIds;
+        return replyToIds;
     }
 
-    private Map<Long,Comment> commentMapConverter(List<Comment> comments){
-        Map<Long,Comment> commentMap = new HashMap<>();
-        for(Comment comment : comments){
-            commentMap.put(comment.getCommentId(),comment);
+    private Map<Long, CacheComment> commentMapConverter(List<CacheComment> comments) {
+        Map<Long, CacheComment> commentMap = new HashMap<>(comments.size());
+        for (CacheComment comment : comments) {
+            commentMap.put(comment.getCommentId(), comment);
         }
         return commentMap;
     }
 
-    private List<CommentResponse> commentResponseListBuilder(List<Comment> comments
-            , Map<Long,Comment> replyMap){
+    private List<CommentResponse> commentResponseListBuilder(List<CacheComment> comments,
+                                                             Map<Long, CacheComment> replyMap) {
         List<CommentResponse> commentResponseList = new ArrayList<>();
-        for (Comment comment : comments) {
-            if (comment == null ) continue;
-            if (comment.getStatus().equals(deleteStatus)) continue;
+        for (CacheComment comment : comments) {
+            if (comment == null || deleteStatus.equals(comment.getStatus())) continue;
             CommentResponse response = new CommentResponse();
             response.setCommentId(comment.getCommentId().toString());
             response.setContent(comment.getContent());
@@ -133,10 +150,10 @@ public class ReadCommentService {
             }
 
             if (comment.getReplyToId() != null && replyMap.containsKey(comment.getReplyToId())) {
-                Comment replyComment = replyMap.get(comment.getReplyToId());
+                CacheComment replyComment = replyMap.get(comment.getReplyToId());
                 response.setReplyToId(replyComment.getCommentId().toString());
                 response.setReplyContent(replyComment.getContent());
-                if(replyComment.getCreateBy()!=null){
+                if (replyComment.getCreateBy() != null) {
                     response.setReplierId(replyComment.getCreateBy().toString());
                 }
             }
@@ -145,4 +162,17 @@ public class ReadCommentService {
         return commentResponseList;
     }
 
+    private CacheComment toCacheComment(Comment entity) {
+        return CacheComment.builder()
+                .commentId(entity.getCommentId())
+                .content(entity.getContent())
+                .status(entity.getStatus())
+                .createBy(entity.getCreateBy())
+                .updateBy(entity.getUpdateBy())
+                .createAt(entity.getCreateAt())
+                .updateAt(entity.getUpdateAt())
+                .replyToId(entity.getReplyToId())
+                .postId(entity.getPostId())
+                .build();
+    }
 }

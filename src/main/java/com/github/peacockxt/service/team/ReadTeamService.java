@@ -1,81 +1,87 @@
 package com.github.peacockxt.service.team;
+
 import com.github.peacockxt.dto.response.TeamResponse;
 import com.github.peacockxt.infrastructure.cache.TeamChannelRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheTeam;
 import com.github.peacockxt.models.Team;
+import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.repository.implementation.TeamRepository;
-import com.github.peacockxt.service.provider.UserProvider;
-import com.github.peacockxt.service.RedisRetryManager;
-import org.springframework.stereotype.Service;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.*;
+
 @Service
 @Slf4j
 @AllArgsConstructor
-public class ReadTeamService{
+public class ReadTeamService {
+    private static final int MAX_BULK_TEAMS = 100;
+
     private final TeamRepository teamRepository;
-    private final TeamChannelRedisDao  teamChannelRedisDao;
-    private final RedisRetryManager redisRetryManager;
-    private final UserProvider  userProvider;
+    private final TeamChannelRedisDao teamChannelRedisDao;
 
     public List<TeamResponse> getTeamForBulkAPI(List<Long> teamIds) {
-        List<Team> teamsInCache = teamChannelRedisDao.getAllTeamInfo(teamIds);
-        List<Long> missingIds = new ArrayList<>();
-        for (int i = 0; i < teamIds.size(); i++) {
-            if(teamsInCache.get(i)==null){
-                missingIds.add(teamIds.get(i));
-            }
+        if (teamIds == null || teamIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        if (teamIds.size() > MAX_BULK_TEAMS) {
+            throw new BusinessLogicException("Maximum " + MAX_BULK_TEAMS + " teamIds per request");
         }
 
-        if(missingIds.isEmpty()) return responses(teamsInCache);
-
-        List<Team> membershipsFromDatabase = fetchAndCacheMissingTeams(missingIds);
-        Map<Long, Team> teamMap = new HashMap<>();
-        for (Team team : membershipsFromDatabase) {
-            teamMap.put(team.getTeamId(), team);
-        }
-
-        List<Team> result = new ArrayList<>(teamIds.size());
-
-        for(int i = 0; i < teamIds.size(); i++){
-            Team team = teamsInCache.get(i);
-            if(team!=null){
-                result.add(team);
-            }
-            else {
-                Team teamFromDb = teamMap.get(teamIds.get(i));
-                if(teamFromDb!=null){
-                    result.add(teamFromDb);
+        List<Long> uniqueIds = new ArrayList<>(new LinkedHashSet<>(teamIds));
+        List<CacheTeam> teamsInCache = teamChannelRedisDao.getAllTeamInfo(uniqueIds);
+        Map<Long, CacheTeam> teamMap = new HashMap<>(uniqueIds.size());
+        if (teamsInCache != null) {
+            for (CacheTeam t : teamsInCache) {
+                if (t != null) {
+                    teamMap.put(t.getTeamId(), t);
                 }
+            }
+        }
+
+        List<Long> missingIds = new ArrayList<>();
+        for (Long id : uniqueIds) {
+            if (!teamMap.containsKey(id)) {
+                missingIds.add(id);
+            }
+        }
+
+        if (!missingIds.isEmpty()) {
+            List<Team> teamsFromDatabase = teamRepository.getTeamsByTeamIds(missingIds);
+            List<CacheTeam> toCache = new ArrayList<>(teamsFromDatabase.size());
+            for (Team entity : teamsFromDatabase) {
+                CacheTeam cacheTeam = toCacheTeam(entity);
+                teamMap.put(cacheTeam.getTeamId(), cacheTeam);
+                toCache.add(cacheTeam);
+            }
+            if (!toCache.isEmpty()) {
+                teamChannelRedisDao.saveTeamInfoBatch(toCache);
+            }
+        }
+
+        List<CacheTeam> result = new ArrayList<>(uniqueIds.size());
+        for (Long id : uniqueIds) {
+            CacheTeam team = teamMap.get(id);
+            if (team != null) {
+                result.add(team);
             }
         }
 
         return responses(result);
     }
 
-    private List<Team> fetchAndCacheMissingTeams(List<Long> teamIds) {
-        List<Team> teams =  teamRepository.getTeamsByTeamIds(teamIds);
-        if(!teams.isEmpty()){
-            redisRetryManager.execute(() -> teamChannelRedisDao.saveTeamInfoBatch(teams));
-        }
-        return teams;
-    }
-
-    List<TeamResponse> responses(List<Team> teams) {
+    List<TeamResponse> responses(List<CacheTeam> teams) {
         List<TeamResponse> responses = new ArrayList<>();
-        for (Team team : teams) {
-            if(!team.getStatus().equals("DELETED")){
+        for (CacheTeam team : teams) {
+            if (team != null && !"DELETED".equals(team.getStatus())) {
                 responses.add(toResponse(team));
             }
         }
         return responses;
     }
 
-
-    private TeamResponse toResponse(Team team) {
+    private TeamResponse toResponse(CacheTeam team) {
         return TeamResponse.builder()
                 .teamId(team.getTeamId())
                 .name(team.getName())
@@ -85,5 +91,17 @@ public class ReadTeamService{
                 .build();
     }
 
+    private CacheTeam toCacheTeam(Team entity) {
+        return CacheTeam.builder()
+                .teamId(entity.getTeamId())
+                .name(entity.getName())
+                .description(entity.getDescription())
+                .status(entity.getStatus())
+                .type(entity.getType())
+                .createAt(entity.getCreateAt())
+                .updateAt(entity.getUpdateAt())
+                .createBy(entity.getCreateBy())
+                .updateBy(entity.getUpdateBy())
+                .build();
+    }
 }
-

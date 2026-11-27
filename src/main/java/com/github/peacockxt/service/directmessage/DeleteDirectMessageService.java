@@ -1,16 +1,14 @@
 package com.github.peacockxt.service.directmessage;
 
-
 import com.github.peacockxt.dto.event.InternalEvent;
 import com.github.peacockxt.dto.event.PrivateMessagePayload;
 import com.github.peacockxt.infrastructure.cache.DirectMessageRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CachePrivateSession;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
-import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.models.DirectMessage;
-import com.github.peacockxt.models.PrivateSession;
+import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.repository.implementation.DirectMessageRepository;
-import com.github.peacockxt.service.provider.DirectMessageProvider;
 import com.github.peacockxt.service.provider.PrivateSessionProvider;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,18 +22,17 @@ import java.time.LocalDateTime;
 @Service
 public class DeleteDirectMessageService {
     private final DirectMessageRepository directMessageRepository;
-    private final DirectMessageRedisDao  directMessageRedisDao;
-    private final DirectMessageProvider directMessageProvider;
-    private final PrivateSessionProvider  privateSessionProvider;
+    private final DirectMessageRedisDao directMessageRedisDao;
+    private final PrivateSessionProvider privateSessionProvider;
     private final String DELETED_STATUS = "DELETED";
     private final String event_name = "DELETED_PRIVATE_MESSAGE";
     private final String DELETED_CONTENT = "Message have been deleted";
     private final LocalEventDispatcher localEventDispatcher;
 
     @Transactional
-    public void deletedDirectMessage( Long directMessageId , Long privateSessionId , Long currentUserId ) {
-        PrivateSession privateSession = privateSessionProvider.getPrivateSession(privateSessionId);
-        if(privateSession == null) {
+    public void deletedDirectMessage(Long directMessageId, Long privateSessionId, Long currentUserId) {
+        CachePrivateSession privateSession = privateSessionProvider.getPrivateSession(privateSessionId);
+        if (privateSession == null) {
             throw new BusinessLogicException("session not found");
         }
 
@@ -46,9 +43,9 @@ public class DeleteDirectMessageService {
             throw new BusinessLogicException("user do not belong to this session");
         }
 
-        DirectMessage message = directMessageProvider.getMessage(directMessageId);
+        DirectMessage message = directMessageRepository.getDirectMessageByMessageId(directMessageId);
 
-        if(message == null) {
+        if (message == null) {
             throw new BusinessLogicException("message not found");
         }
 
@@ -58,18 +55,17 @@ public class DeleteDirectMessageService {
 
         directMessageRepository.save(message);
 
-        localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(message,privateSessionId ));
+        localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(message, privateSessionId));
 
-        TransactionSynchronizationManager.registerSynchronization( new TransactionSynchronization () {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
                 directMessageRedisDao.deleteMessageData(directMessageId);
             }
         });
-
     }
 
-    InternalEvent<PrivateMessagePayload> internalEventBuilder(DirectMessage directMessage , Long privateSessionId ) {
+    InternalEvent<PrivateMessagePayload> internalEventBuilder(DirectMessage directMessage, Long privateSessionId) {
         PrivateMessagePayload payload = PrivateMessagePayload.builder()
                 .messageId(directMessage.getMessageId())
                 .content(directMessage.getContent())
@@ -82,5 +78,4 @@ public class DeleteDirectMessageService {
                 .destination(WebsocketDestination.PRIVATE_SESSION.getDestination(privateSessionId))
                 .build();
     }
-
 }

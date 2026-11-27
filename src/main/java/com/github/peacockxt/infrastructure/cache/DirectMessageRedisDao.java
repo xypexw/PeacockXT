@@ -1,11 +1,15 @@
 package com.github.peacockxt.infrastructure.cache;
 
-import com.github.peacockxt.models.DirectMessage;
+import com.github.peacockxt.infrastructure.cache.models.CacheDirectMessage;
 import com.github.peacockxt.infrastructure.constants.RedisKey;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Range;
+import org.springframework.data.redis.connection.Limit;
 import org.springframework.data.redis.core.DefaultTypedTuple;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -17,28 +21,39 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class DirectMessageRedisDao {
 
-    // Retain up to the 300 most recent direct messages per session
     private static final int MAX_INDEX_SIZE = 300;
 
-    private final RedisTemplate<String, DirectMessage> dmRedisTemplate;
-    private final RedisTemplate<String, Long> longRedisTemplate;
+    private static final DefaultRedisScript<Long> ADD_IF_EXISTS_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call('EXISTS', KEYS[1]) == 1 then " +
+            "  redis.call('ZADD', KEYS[1], 0, ARGV[1]); " +
+            "  redis.call('ZREMRANGEBYRANK', KEYS[1], 0, tonumber(ARGV[2])); " +
+            "  redis.call('EXPIRE', KEYS[1], tonumber(ARGV[3])); " +
+            "  return 1; " +
+            "end; " +
+            "return 0;",
+            Long.class
+    );
+
+    private final RedisTemplate<String, CacheDirectMessage> dmRedisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
     private final RedisBatch redisBatch;
     private final RedisOperationGuard redisGuard;
 
-    // --- HELPER: Add Jitter to TTL (Random from 0 to 30 minutes) ---
     private Duration addJitter(Duration baseTtl) {
         if (baseTtl == null) return null;
         return baseTtl.plusSeconds(ThreadLocalRandom.current().nextLong(1800));
     }
 
-    // ==========================================
-    // 1. SAVE / UPDATE MESSAGE (WRITE -> safeWrite)
-    // ==========================================
-    public void saveMessage(Long sessionId, DirectMessage message) {
+    private static String formatId(Long id) {
+        return String.format("%019d", id);
+    }
+
+    public void saveMessage(Long sessionId, CacheDirectMessage message) {
+        if (sessionId == null || message == null || message.getMessageId() == null) return;
+
         redisGuard.safeWrite(() -> {
             Long messageId = message.getMessageId();
 
-            // 1. Save Message Data
             String dataKey = RedisKey.DIRECT_MESSAGE_DATA.build(messageId);
             dmRedisTemplate.opsForValue().set(
                     dataKey,
@@ -46,12 +61,15 @@ public class DirectMessageRedisDao {
                     addJitter(RedisKey.DIRECT_MESSAGE_DATA.getTtl())
             );
 
-            // 2. Save Index to Session ZSet
             String indexKey = RedisKey.SESSION_MSG_INDEX.build(sessionId);
-            longRedisTemplate.opsForZSet().add(indexKey, messageId, messageId.doubleValue());
-
-            // 3. Trim Index to keep only the latest 300 messages
-            longRedisTemplate.opsForZSet().removeRange(indexKey, 0, -(MAX_INDEX_SIZE + 1));
+            Duration indexTtl = addJitter(RedisKey.SESSION_MSG_INDEX.getTtl());
+            stringRedisTemplate.execute(
+                    ADD_IF_EXISTS_SCRIPT,
+                    Collections.singletonList(indexKey),
+                    formatId(messageId),
+                    String.valueOf(-(MAX_INDEX_SIZE + 1)),
+                    String.valueOf(indexTtl.getSeconds())
+            );
         }, "saveMessage: sessionId=" + sessionId + ", messageId=" + message.getMessageId());
     }
 
@@ -62,21 +80,29 @@ public class DirectMessageRedisDao {
 
         redisGuard.safeWrite(() -> {
             String key = RedisKey.SESSION_MSG_INDEX.build(sessionId);
-            Set<ZSetOperations.TypedTuple<Long>> tuples = new HashSet<>();
+            Set<ZSetOperations.TypedTuple<String>> tuples = new HashSet<>(messageIds.size());
             for (Long messageId : messageIds) {
-                tuples.add(new DefaultTypedTuple<>(messageId, messageId.doubleValue()));
+                if (messageId != null) {
+                    tuples.add(new DefaultTypedTuple<>(formatId(messageId), 0.0));
+                }
             }
-            longRedisTemplate.opsForZSet().add(key, tuples);
+            if (!tuples.isEmpty()) {
+                stringRedisTemplate.opsForZSet().add(key, tuples);
+                stringRedisTemplate.opsForZSet().removeRange(key, 0, -(MAX_INDEX_SIZE + 1));
+                stringRedisTemplate.expire(key, addJitter(RedisKey.SESSION_MSG_INDEX.getTtl()));
+            }
         }, "saveMessageIndexes: sessionId=" + sessionId + ", size=" + messageIds.size());
     }
 
-    public void multiSetMessageData(List<DirectMessage> messages) {
+    public void multiSetMessageData(List<CacheDirectMessage> messages) {
         if (messages == null || messages.isEmpty()) return;
 
         redisGuard.safeWrite(() -> {
-            Map<String, DirectMessage> maps = new HashMap<>();
-            for (DirectMessage message : messages) {
-                maps.put(RedisKey.DIRECT_MESSAGE_DATA.build(message.getMessageId()), message);
+            Map<String, CacheDirectMessage> maps = new HashMap<>();
+            for (CacheDirectMessage message : messages) {
+                if (message != null && message.getMessageId() != null) {
+                    maps.put(RedisKey.DIRECT_MESSAGE_DATA.build(message.getMessageId()), message);
+                }
             }
 
             redisBatch.multiSetWithTtl(
@@ -87,10 +113,8 @@ public class DirectMessageRedisDao {
         }, "multiSetMessageData: size=" + messages.size());
     }
 
-    // ==========================================
-    // 2. GET MESSAGE - SINGLE & BATCH (READ -> safeRead)
-    // ==========================================
-    public DirectMessage getMessageData(Long messageId) {
+    public CacheDirectMessage getMessageData(Long messageId) {
+        if (messageId == null) return null;
         return redisGuard.safeRead(
                 () -> dmRedisTemplate.opsForValue().get(RedisKey.DIRECT_MESSAGE_DATA.build(messageId)),
                 null,
@@ -98,7 +122,7 @@ public class DirectMessageRedisDao {
         );
     }
 
-    public List<DirectMessage> getMessagesBatch(List<Long> messageIds) {
+    public List<CacheDirectMessage> getMessagesBatch(List<Long> messageIds) {
         if (messageIds == null || messageIds.isEmpty()) return Collections.emptyList();
 
         return redisGuard.safeRead(() -> {
@@ -106,37 +130,38 @@ public class DirectMessageRedisDao {
                     .map(RedisKey.DIRECT_MESSAGE_DATA::build)
                     .collect(Collectors.toList());
 
-            List<DirectMessage> messages = dmRedisTemplate.opsForValue().multiGet(keys);
+            List<CacheDirectMessage> messages = dmRedisTemplate.opsForValue().multiGet(keys);
             return (messages == null || messages.isEmpty()) ? Collections.emptyList() : messages;
         }, Collections.emptyList(), "getMessagesBatch: size=" + messageIds.size());
     }
 
-    // ==========================================
-    // 3. CURSOR - PAGINATION (READ -> safeRead)
-    // ==========================================
     public Set<Long> getMessageIdsBeforeCursor(Long sessionId, Long cursorMessageId, int limit) {
+        if (sessionId == null || limit <= 0) return Collections.emptySet();
+
         return redisGuard.safeRead(() -> {
             String indexKey = RedisKey.SESSION_MSG_INDEX.build(sessionId);
-
+            Set<String> raw;
             if (cursorMessageId == null) {
-                // Initial page load: retrieve the most recent message IDs
-                Set<Long> result = longRedisTemplate.opsForZSet().reverseRange(indexKey, 0, limit - 1);
-                return result == null ? Collections.emptySet() : result;
+                raw = stringRedisTemplate.opsForZSet().reverseRange(indexKey, 0, limit - 1);
             } else {
-                // Subsequent page loads: fetch messages older than cursor
-                Set<Long> result = longRedisTemplate.opsForZSet().reverseRangeByScore(
-                        indexKey, 0, cursorMessageId - 1, 0, limit
+                raw = stringRedisTemplate.opsForZSet().reverseRangeByLex(
+                        indexKey,
+                        Range.leftUnbounded(Range.Bound.exclusive(formatId(cursorMessageId))),
+                        Limit.limit().count(limit)
                 );
-                return result == null ? Collections.emptySet() : result;
             }
+            if (raw == null || raw.isEmpty()) return Collections.emptySet();
+            Set<Long> result = new LinkedHashSet<>(raw.size());
+            for (String s : raw) {
+                result.add(Long.parseLong(s));
+            }
+            return result;
         }, Collections.emptySet(), "getMessageIdsBeforeCursor: sessionId=" + sessionId + ", cursor=" + cursorMessageId);
     }
 
-    // ==========================================
-    // 4. DELETE MESSAGE (WRITE/DELETE -> safeWrite)
-    // ==========================================
     public void deleteMessageData(Long messageId) {
-        redisGuard.safeWrite(
+        if (messageId == null) return;
+        redisGuard.safeInvalidate(
                 () -> dmRedisTemplate.delete(RedisKey.DIRECT_MESSAGE_DATA.build(messageId)),
                 "deleteMessageData: messageId=" + messageId
         );

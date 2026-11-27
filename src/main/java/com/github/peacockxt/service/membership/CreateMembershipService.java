@@ -1,5 +1,7 @@
 package com.github.peacockxt.service.membership;
 
+import com.github.peacockxt.infrastructure.cache.MembershipRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheMembership;
 import com.github.peacockxt.models.Membership;
 import com.github.peacockxt.models.Team;
 import com.github.peacockxt.models.User;
@@ -7,21 +9,18 @@ import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.repository.implementation.MembershipRepository;
 import com.github.peacockxt.repository.implementation.TeamRepository;
 import com.github.peacockxt.repository.implementation.UserRepository;
-import com.github.peacockxt.infrastructure.cache.MembershipRedisDao;
 import com.github.peacockxt.service.SnowflakeIdGenerator;
 import com.github.peacockxt.service.provider.TeamProvider;
 import com.github.peacockxt.service.provider.UserProvider;
+import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.NonNull;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
 import java.time.LocalDateTime;
-
-import org.springframework.lang.NonNull;
-import org.springframework.stereotype.Service;
 
 @Service
 @AllArgsConstructor
@@ -49,20 +48,28 @@ public class CreateMembershipService {
         Membership membership = buildMembership(userId, teamId, role);
         saveMembershipToDatabase(membership);
 
+        CacheMembership cacheMembership = CacheMembership.builder()
+                .membershipId(membership.getMembershipId())
+                .userId(userId)
+                .teamId(teamId)
+                .role(membership.getRole())
+                .joinedAt(membership.getJoinedAt())
+                .build();
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                saveMembershipToCache(userId, teamId, membership);
+                saveMembershipToCache(userId, teamId, cacheMembership);
             }
         });
     }
 
-    private void saveMembershipToCache(Long userId, Long teamId, Membership membership) {
+    private void saveMembershipToCache(Long userId, Long teamId, CacheMembership membership) {
         membershipRedisDao.saveMembershipInfo(membership);
-        if(membershipRedisDao.hasMembershipIndexTeamKey(teamId)){
+        if (membershipRedisDao.hasMembershipIndexTeamKey(teamId)) {
             membershipRedisDao.addMembershipToTeam(membership.getMembershipId(), teamId);
         }
-        if(membershipRedisDao.hasMembershipIndexUserKey(userId)){
+        if (membershipRedisDao.hasMembershipIndexUserKey(userId)) {
             membershipRedisDao.addMembershipToUser(membership.getMembershipId(), userId);
         }
     }

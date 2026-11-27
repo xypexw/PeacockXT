@@ -1,16 +1,14 @@
 package com.github.peacockxt.service.directmessage;
 
-
 import com.github.peacockxt.dto.event.InternalEvent;
 import com.github.peacockxt.dto.event.PrivateMessagePayload;
 import com.github.peacockxt.infrastructure.cache.DirectMessageRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CachePrivateSession;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
-import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.models.DirectMessage;
-import com.github.peacockxt.models.PrivateSession;
+import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.repository.implementation.DirectMessageRepository;
-import com.github.peacockxt.service.provider.DirectMessageProvider;
 import com.github.peacockxt.service.provider.PrivateSessionProvider;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,7 +24,6 @@ public class UpdateDirectMessageService {
 
     private final DirectMessageRepository directMessageRepository;
     private final DirectMessageRedisDao directMessageRedisDao;
-    private final DirectMessageProvider directMessageProvider;
     private final PrivateSessionProvider privateSessionProvider;
 
     private final LocalEventDispatcher localEventDispatcher;
@@ -35,11 +32,10 @@ public class UpdateDirectMessageService {
     private final String event_name = "UPDATE_PRIVATE_MESSAGE";
 
     @Transactional
-    public void updatedDirectMessage( Long directMessageId , Long privateSessionId ,
-                                      Long currentUserId , String content ) {
-        PrivateSession privateSession = privateSessionProvider.getPrivateSession(privateSessionId);
-        DirectMessage message = directMessageProvider.getMessage(directMessageId);
-        if(privateSession == null) {
+    public void updatedDirectMessage(Long directMessageId, Long privateSessionId,
+                                     Long currentUserId, String content) {
+        CachePrivateSession privateSession = privateSessionProvider.getPrivateSession(privateSessionId);
+        if (privateSession == null) {
             throw new BusinessLogicException("session not found");
         }
         boolean isParticipant = privateSession.getConnectorId().equals(currentUserId)
@@ -48,7 +44,8 @@ public class UpdateDirectMessageService {
             throw new BusinessLogicException("user do not belong to this session");
         }
 
-        if(message == null) {
+        DirectMessage message = directMessageRepository.getDirectMessageByMessageId(directMessageId);
+        if (message == null) {
             throw new BusinessLogicException("message not found");
         }
 
@@ -57,7 +54,7 @@ public class UpdateDirectMessageService {
         message.setUpdatedAt(LocalDateTime.now());
 
         directMessageRepository.save(message);
-        localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(message,privateSessionId));
+        localEventDispatcher.dispatchToRabbitMQ(internalEventBuilder(message, privateSessionId));
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
@@ -65,10 +62,9 @@ public class UpdateDirectMessageService {
                 directMessageRedisDao.deleteMessageData(directMessageId);
             }
         });
-
     }
 
-    InternalEvent<PrivateMessagePayload> internalEventBuilder( DirectMessage message , Long privateSessionId ) {
+    InternalEvent<PrivateMessagePayload> internalEventBuilder(DirectMessage message, Long privateSessionId) {
         PrivateMessagePayload payload = PrivateMessagePayload.builder()
                 .messageId(message.getMessageId())
                 .content(message.getContent())
@@ -81,6 +77,4 @@ public class UpdateDirectMessageService {
                 .destination(WebsocketDestination.PRIVATE_SESSION.getDestination(privateSessionId))
                 .build();
     }
-
-
 }

@@ -2,14 +2,14 @@ package com.github.peacockxt.service.channel;
 
 import com.github.peacockxt.dto.event.ChannelPayload;
 import com.github.peacockxt.dto.event.InternalEvent;
+import com.github.peacockxt.infrastructure.cache.MessageRedisDao;
 import com.github.peacockxt.infrastructure.cache.TeamChannelRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheMembership;
 import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
 import com.github.peacockxt.infrastructure.messagequeue.LocalEventDispatcher;
 import com.github.peacockxt.models.Channel;
 import com.github.peacockxt.models.customexception.BusinessLogicException;
-import com.github.peacockxt.models.Membership;
 import com.github.peacockxt.repository.implementation.ChannelRepository;
-import com.github.peacockxt.service.provider.ChannelProvider;
 import com.github.peacockxt.service.provider.MembershipProvider;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,8 +24,8 @@ import java.time.LocalDateTime;
 public class DeleteChannelService {
     private final ChannelRepository channelRepository;
     private final TeamChannelRedisDao teamChannelRedisDao;
+    private final MessageRedisDao messageRedisDao;
     private final MembershipProvider membershipProvider;
-    private final ChannelProvider channelProvider;
 
     private final LocalEventDispatcher localEventDispatcher;
 
@@ -35,27 +35,27 @@ public class DeleteChannelService {
     @Transactional
     public void deleteChannel(Long channelId, Long userId, Long teamId, Long membershipId) {
 
-        Membership membership = membershipProvider.getMembership(membershipId);
-        Channel channel = channelProvider.getChannel(channelId);
+        CacheMembership membership = membershipProvider.getMembership(membershipId);
+        Channel channel = channelRepository.getChannelByChannelId(channelId);
 
-        if(membership == null) {
+        if (membership == null) {
             throw new BusinessLogicException("Membership not found");
         }
-        if(!membership.getUserId().equals(userId) || !membership.getTeamId().equals(teamId)) {
+        if (!membership.getUserId().equals(userId) || !membership.getTeamId().equals(teamId)) {
             throw new BusinessLogicException("UserId or Team Id in Membership mismatch");
         }
 
-        if(channel == null) {
+        if (channel == null) {
             throw new BusinessLogicException("Channel not found");
         }
 
-        if(membership.getRole().equals("READER")){
+        if ("READER".equals(membership.getRole())) {
             throw new BusinessLogicException("Doesn't have permission to update channel");
         }
 
         boolean isCreator = channel.getCreateBy().equals(membership.getUserId());
-        boolean isOwner = membership.getRole().equals("OWNER");
-        boolean isAdmin = membership.getRole().equals("ADMIN");
+        boolean isOwner = "OWNER".equals(membership.getRole());
+        boolean isAdmin = "ADMIN".equals(membership.getRole());
         if (!isCreator && !isOwner && !isAdmin) {
             throw new BusinessLogicException("Doesn't have permission to update channel");
         }
@@ -76,8 +76,8 @@ public class DeleteChannelService {
             public void afterCommit() {
                 teamChannelRedisDao.deleteChannelInfo(channelId);
                 teamChannelRedisDao.removeChannelIndexFromTeam(teamId, channelId);
+                messageRedisDao.deleteChannelMsgIndex(channelId);
             }
         });
     }
-
 }

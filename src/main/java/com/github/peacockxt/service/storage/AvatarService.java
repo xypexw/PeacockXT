@@ -1,9 +1,9 @@
 package com.github.peacockxt.service.storage;
+
 import com.github.peacockxt.infrastructure.cache.UserSessionRedisDao;
-import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.models.User;
+import com.github.peacockxt.models.customexception.BusinessLogicException;
 import com.github.peacockxt.repository.implementation.UserRepository;
-import com.github.peacockxt.service.provider.UserProvider;
 import com.github.peacockxt.service.RedisRetryManager;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,27 +19,26 @@ public class AvatarService {
 
     private final UserRepository userRepository;
     private final UserSessionRedisDao userSessionRedisDao;
-    private final UserProvider userProvider;
-    private final RedisRetryManager  redisRetryManager;
+    private final RedisRetryManager redisRetryManager;
+
     @Transactional
     public void updateAvatarLink(String objectName, Long userId) {
-        if (!userProvider.hasUser(userId)) {
+        User user = userRepository.getUserByUserId(userId);
+        if (user == null) {
             throw new BusinessLogicException("User does not exist");
         }
-        User user = userProvider.getUser(userId);
         user.setAvatarUrl(objectName);
         userRepository.save(user);
-
 
         executeAfterCommit(() -> userSessionRedisDao.deleteUserProfile(userId));
     }
 
     @Transactional
     public void deleteAvatarLink(Long userId) {
-        if (!userProvider.hasUser(userId)) {
+        User user = userRepository.getUserByUserId(userId);
+        if (user == null) {
             throw new BusinessLogicException("User does not exist");
         }
-        User user = userProvider.getUser(userId);
         user.setAvatarUrl("");
         userRepository.save(user);
 

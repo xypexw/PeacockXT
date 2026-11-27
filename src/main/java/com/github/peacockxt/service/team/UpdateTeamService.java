@@ -2,12 +2,12 @@ package com.github.peacockxt.service.team;
 
 import com.github.peacockxt.dto.event.InternalEvent;
 import com.github.peacockxt.dto.event.TeamPayload;
-import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
-import com.github.peacockxt.models.customexception.BusinessLogicException;
-import com.github.peacockxt.models.Team;
-import com.github.peacockxt.repository.implementation.TeamRepository;
 import com.github.peacockxt.infrastructure.cache.TeamChannelRedisDao;
-import com.github.peacockxt.service.provider.TeamProvider;
+import com.github.peacockxt.infrastructure.cache.models.CacheTeam;
+import com.github.peacockxt.infrastructure.constants.WebsocketDestination;
+import com.github.peacockxt.models.Team;
+import com.github.peacockxt.models.customexception.BusinessLogicException;
+import com.github.peacockxt.repository.implementation.TeamRepository;
 import com.github.peacockxt.service.provider.UserProvider;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
@@ -25,7 +25,6 @@ public class UpdateTeamService {
     private final TeamRepository teamRepository;
     private final TeamChannelRedisDao teamChannelRedisDao;
     private final UserProvider userProvider;
-    private final TeamProvider teamProvider;
 
     private final String event_name = "UPDATE_TEAM";
     private final String UPDATED_STATUS = "UPDATED";
@@ -36,7 +35,7 @@ public class UpdateTeamService {
             throw new BusinessLogicException("User does not exist or is invalid");
         }
 
-        Team team = teamProvider.getTeam(teamId);
+        Team team = teamRepository.getTeamByTeamId(teamId);
         if (team == null) {
             throw new BusinessLogicException("Team does not exist");
         }
@@ -49,25 +48,36 @@ public class UpdateTeamService {
 
         teamRepository.save(team);
 
+        CacheTeam cacheTeam = CacheTeam.builder()
+                .teamId(team.getTeamId())
+                .name(team.getName())
+                .description(team.getDescription())
+                .status(team.getStatus())
+                .type(team.getType())
+                .createAt(team.getCreateAt())
+                .updateAt(team.getUpdateAt())
+                .createBy(team.getCreateBy())
+                .updateBy(team.getUpdateBy())
+                .build();
+
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {
-                    teamChannelRedisDao.saveTeamInfo(team);
+                    teamChannelRedisDao.saveTeamInfo(cacheTeam);
                 }
             });
         } else {
-            teamChannelRedisDao.saveTeamInfo(team);
+            teamChannelRedisDao.saveTeamInfo(cacheTeam);
         }
     }
 
     InternalEvent<TeamPayload> internalEventBuilder(Team team) {
-        TeamPayload payload =  TeamPayload.builder()
+        TeamPayload payload = TeamPayload.builder()
                 .teamId(team.getTeamId())
                 .name(team.getName())
                 .description(team.getDescription())
                 .type(team.getType())
-                .status(team.getStatus())
                 .status(team.getStatus())
                 .build();
         return InternalEvent.<TeamPayload>builder()
@@ -76,5 +86,4 @@ public class UpdateTeamService {
                 .destination(WebsocketDestination.TEAM.getDestination(team.getTeamId()))
                 .build();
     }
-
 }

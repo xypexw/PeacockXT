@@ -3,6 +3,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 
+import java.util.concurrent.locks.ReentrantLock;
+
 @Service
 public class SnowflakeIdGenerator {
 
@@ -23,6 +25,7 @@ public class SnowflakeIdGenerator {
 
     private long sequence = 0L;
     private long lastTimestamp = -1L;
+    private final ReentrantLock lock = new ReentrantLock();
 
     @Value("${workerId}")
     private long workerId;
@@ -35,28 +38,33 @@ public class SnowflakeIdGenerator {
         }
     }
 
-    public synchronized long nextId() {
-        long currentTime = System.currentTimeMillis();
+    public long nextId() {
+        lock.lock();
+        try {
+            long currentTime = System.currentTimeMillis();
 
-        if (currentTime < lastTimestamp) {
-            throw new RuntimeException(String.format("System clock moved backwards. " +
-                    "Refusing to generate ID for %d milliseconds", lastTimestamp - currentTime));
-        }
-
-        if (currentTime == lastTimestamp) {
-            sequence = (sequence + 1) & maxSequence;
-            if (sequence == 0) {
-                currentTime = waitNextMillis(currentTime);
+            if (currentTime < lastTimestamp) {
+                throw new RuntimeException(String.format("System clock moved backwards. " +
+                        "Refusing to generate ID for %d milliseconds", lastTimestamp - currentTime));
             }
-        } else {
-            sequence = 0L;
+
+            if (currentTime == lastTimestamp) {
+                sequence = (sequence + 1) & maxSequence;
+                if (sequence == 0) {
+                    currentTime = waitNextMillis(currentTime);
+                }
+            } else {
+                sequence = 0L;
+            }
+
+            lastTimestamp = currentTime;
+
+            return ((currentTime - epoch) << timestampLeftShift)
+                    | (workerId << workerIdShift)
+                    | sequence;
+        } finally {
+            lock.unlock();
         }
-
-        lastTimestamp = currentTime;
-
-        return ((currentTime - epoch) << timestampLeftShift)
-                | (workerId << workerIdShift)
-                | sequence;
     }
 
     private long waitNextMillis(long currentTime) {

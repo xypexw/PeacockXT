@@ -3,15 +3,14 @@ package com.github.peacockxt.configuration;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.github.peacockxt.models.*;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.github.peacockxt.infrastructure.cache.models.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.hibernate6.Hibernate6Module;
 
 @Configuration
 public class RedisConfig {
@@ -24,71 +23,70 @@ public class RedisConfig {
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,Object.class);
+        return buildTemplate(cf, Object.class);
     }
-
 
     @Bean
     public RedisTemplate<String, Long> longRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,Long.class);
+        return buildTemplate(cf, Long.class);
     }
 
     @Bean
-    public RedisTemplate<String, Comment> commentRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,Comment.class);
+    public RedisTemplate<String, CacheComment> commentRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CacheComment.class);
     }
 
     @Bean
-    public RedisTemplate<String, Team> teamRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,Team.class);
+    public RedisTemplate<String, CacheTeam> teamRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CacheTeam.class);
     }
 
     @Bean
-    public RedisTemplate<String, User> userRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,User.class);
+    public RedisTemplate<String, CacheUser> userRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CacheUser.class);
     }
 
     @Bean
-    public RedisTemplate<String, Message> messageRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,Message.class);
+    public RedisTemplate<String, CacheMessage> messageRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CacheMessage.class);
     }
 
     @Bean
-    public RedisTemplate<String, Membership> membershipRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,Membership.class);
+    public RedisTemplate<String, CacheMembership> membershipRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CacheMembership.class);
     }
 
     @Bean
-    public RedisTemplate<String, Channel> channelRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,Channel.class);
+    public RedisTemplate<String, CacheChannel> channelRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CacheChannel.class);
     }
 
     @Bean
-    public RedisTemplate<String, CustomEmoji> customEmojiRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,CustomEmoji.class);
+    public RedisTemplate<String, CacheCustomEmoji> customEmojiRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CacheCustomEmoji.class);
     }
 
     @Bean
-    public RedisTemplate<String, DirectMessage> directMessageRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,DirectMessage.class);
+    public RedisTemplate<String, CacheDirectMessage> directMessageRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CacheDirectMessage.class);
     }
 
     @Bean
-    public RedisTemplate<String, Event> eventRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,Event.class);
+    public RedisTemplate<String, CacheEvent> eventRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CacheEvent.class);
     }
 
     @Bean
-    public RedisTemplate<String, Post> postRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,Post.class);
+    public RedisTemplate<String, CachePost> postRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CachePost.class);
     }
 
     @Bean
-    public RedisTemplate<String, PrivateSession> privateSessionRedisTemplate(RedisConnectionFactory cf) {
-        return buildTemplate(cf,PrivateSession.class);
+    public RedisTemplate<String, CachePrivateSession> privateSessionRedisTemplate(RedisConnectionFactory cf) {
+        return buildTemplate(cf, CachePrivateSession.class);
     }
 
-    private <T> RedisTemplate<String, T> buildTemplate(RedisConnectionFactory cf , Class<T> clazz) {
+    private <T> RedisTemplate<String, T> buildTemplate(RedisConnectionFactory cf, Class<T> clazz) {
         RedisTemplate<String, T> template = new RedisTemplate<>();
         template.setConnectionFactory(cf);
 
@@ -98,11 +96,6 @@ public class RedisConfig {
 
         ObjectMapper redisMapper = globalObjectMapper.copy();
         redisMapper.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
-
-        Hibernate6Module hibernateModule = new Hibernate6Module();
-        hibernateModule.configure(Hibernate6Module.Feature.SERIALIZE_IDENTIFIER_FOR_LAZY_NOT_LOADED_OBJECTS, true);
-
-        redisMapper.registerModule(hibernateModule);
         redisMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
 
         Jackson2JsonRedisSerializer<T> jsonSerializer = new Jackson2JsonRedisSerializer<>(redisMapper, clazz);

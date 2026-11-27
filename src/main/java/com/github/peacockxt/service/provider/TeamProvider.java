@@ -1,10 +1,10 @@
 package com.github.peacockxt.service.provider;
 
+import com.github.peacockxt.infrastructure.cache.TeamChannelRedisDao;
+import com.github.peacockxt.infrastructure.cache.models.CacheTeam;
 import com.github.peacockxt.models.Team;
 import com.github.peacockxt.models.customexception.DatabaseException;
 import com.github.peacockxt.repository.implementation.TeamRepository;
-import com.github.peacockxt.infrastructure.cache.TeamChannelRedisDao;
-import com.github.peacockxt.service.RedisRetryManager;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,52 +16,35 @@ public class TeamProvider {
 
     private final TeamRepository teamRepository;
     private final TeamChannelRedisDao teamChannelRedisDao;
-    private final RedisRetryManager redisRetryManager;
 
     public boolean hasTeam(Long teamId) {
-        Team team = hasTeamInCache(teamId);
-        if (team != null) return true;
+        return getTeam(teamId) != null;
+    }
+
+    public CacheTeam getTeam(Long teamId) {
+        if (teamId == null) return null;
+        CacheTeam cached = teamChannelRedisDao.getTeamInfo(teamId);
+        if (cached != null) return cached;
 
         try {
-            team = teamRepository.getTeamByTeamId(teamId);
-            if (team == null) return false;
+            Team team = teamRepository.getTeamByTeamId(teamId);
+            if (team == null) return null;
 
-            saveTeamInfoToCache(team);
-            return true;
+            CacheTeam cacheTeam = CacheTeam.builder()
+                    .teamId(team.getTeamId())
+                    .name(team.getName())
+                    .description(team.getDescription())
+                    .status(team.getStatus())
+                    .type(team.getType())
+                    .createAt(team.getCreateAt())
+                    .updateAt(team.getUpdateAt())
+                    .createBy(team.getCreateBy())
+                    .updateBy(team.getUpdateBy())
+                    .build();
+            teamChannelRedisDao.saveTeamInfo(cacheTeam);
+            return cacheTeam;
         } catch (Exception e) {
             throw new DatabaseException("Failed to query Team from database", e);
         }
     }
-
-    public Team getTeam(Long teamId) {
-        Team team = hasTeamInCache(teamId);
-        if (team != null) return team;
-
-        try {
-            team = teamRepository.getTeamByTeamId(teamId);
-            if (team != null) saveTeamInfoToCache(team);
-            return team;
-        } catch (Exception e) {
-            throw new DatabaseException("Failed to query Team from database", e);
-        }
-    }
-
-    private Team hasTeamInCache(Long teamId) {
-        try {
-            return teamChannelRedisDao.getTeamInfo(teamId);
-        } catch (Exception e) {
-            log.error("Failed to read Team from Redis: {}", e.getMessage(), e);
-            return null;
-        }
-    }
-
-    private void saveTeamInfoToCache(Team team) {
-        try {
-            teamChannelRedisDao.saveTeamInfo(team);
-        } catch (Exception e) {
-            log.warn("Failed to cache team info, adding task to retry manager: {}", e.getMessage());
-            redisRetryManager.execute(() -> teamChannelRedisDao.saveTeamInfo(team));
-        }
-    }
-
 }
